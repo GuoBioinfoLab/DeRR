@@ -1,10 +1,6 @@
 # DeRR
 
-<a href='blank'><img src='DEERR_logo.png' align='right' height='250'>
-
-</a>
-
-
+<img src='DEERR_logo.png' align='right' height=350>
 
 ## What is **DERR
 
