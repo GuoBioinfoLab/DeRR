@@ -97,8 +97,8 @@ def BuiltPath(path, v_nodes, j_nodes, k=25):
     segment = path[1] + "".join([ kmer[-1] for kmer in path[2:-1] ])
     
     total_len = (v_pos-j_pos+len(segment)-k) + len(j)
-    fill_v = v + "*"*(total_len - len(v))
-    fill_j = '*' * (v_pos-j_pos+len(segment)-k) + j
+    fill_v = v[0:v_pos] + segment + '*'*(total_len - len(segment) - v_pos)
+    fill_j = '*'*(total_len - len(j)) + j
     
     res = 0
     merged_seq = []

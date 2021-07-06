@@ -1,13 +1,13 @@
 import argparse
 from logging import debug
 from Bio import SeqIO
-import pandas as pd 
+import pandas as pd
 import os
 import time
 import pysam
+from tqdm.contrib.concurrent import process_map
 import re
 import tools
-import tqdm
 import networkx as nx
 from tempfile import TemporaryFile, NamedTemporaryFile
 import multiprocessing
@@ -23,7 +23,7 @@ class Myread(object):
         self.name = name
         self.qual = qual
         self.vgene = vgene
-        self.jgene = jgene 
+        self.jgene = jgene
         self.cdr3 = cdr3
         self.avlb = avlb
 
@@ -36,7 +36,7 @@ class Myread(object):
             'CDR3': self.cdr3,
             'Aviable': self.avlb
         }
-        
+
     def __len__(self):
         return len(self.seq)
 
@@ -57,7 +57,7 @@ def SegmentFromCigar( cigartuples  ):
 def real_score(rd, ref_seq):
     start, _ = SegmentFromCigar(rd.cigartuples)
     r_pos = rd.reference_start
-    score = 0 
+    score = 0
     for index in range(len(rd.seq)):
         offset = index - start
         if 0 <= r_pos + offset < len(ref_seq) - 9 :
@@ -72,10 +72,12 @@ def map2align(inp, ref, threads):
     #TODO(chensy) change to config.json
     bwa = "bwa"
     samtools = "samtools"
-    fastp = "fastp"
 
     sam_file = NamedTemporaryFile(delete=False).name
+    #os.system(f"{bwa} mem  -t {threads} -k 10 -A 1 -B 2 -L 0 -T 17 -v 0 {ref} {inp} 2>/dev/null | {samtools} view -bSh -F 2308 - 2>/dev/null | {samtools} sort -n -o - - > {sam_file} 2>/dev/null")os.system(f"{bwa} mem  -t {threads} -k 10 -A 1 -B 2 -L 0 -T 17 -v 0 {ref} {inp} 2>/dev/null | {samtools} view -bSh -F 2308 - | {samtools} sort -n -o - - > {sam_file}")
     os.system(f"{bwa} mem  -t {threads} -k 10 -A 1 -B 2 -L 0 -T 17 -v 0 {ref} {inp} 2>/dev/null | {samtools} view -Sh -F 2308 - 2>/dev/null > {sam_file}")
+    #os.system(f"{bwa} mem  -t {threads} -k 10 -A 1 -B 2 -L 0 -T 17 -v 0 {ref} {inp} 2>/dev/null | {samtools} view -bSh -F 2308 - 2>/dev/null | {samtools} sort -n - {sam_file} 2>/dev/null")
+    #os.system(f"{bwa} mem  -t {threads} -k 10 -A 1 -B 2 -L 0 -T 17 -v 0 {ref} {inp} | {samtools} view -Sh -F 2308 - > {sam_file}")
 
     #bwa mem -v 1 -t 4 -k 8 -A 1 -B 2 -L 0 -T 17 ../reference/TRB/TRBV-gai6-DNA.fa ../10xTCR_testSample/TTTCCTCCAATACGCT-1.fastq | samtools view -Sh -F 2308 - > 10XV.sam
     #bwa mem -v 1 -t 4 -k 8 -A 1 -B 2 -L 0 -T 17 ../reference/TRB/TRBV-gai6-DNA.fa /workspace/chensy/dual/1.Data/liver/Sample_PD10_ZZM_TTS98-0205.1.clean.fq /workspace/chensy/dual/1.Data/liver/Sample_PD10_ZZM_TTS98-0205.2.clean.fq | samtools view -Sh -F 2308 - > SmartV.sam
@@ -95,24 +97,24 @@ def most_common(vals, cnts):
         return 'None'
 
 def align(inp, threads=1):
-    
+
     ##### QC
     fastp = 'fastp'
     r1, r2 = inp
-    
+
     output = NamedTemporaryFile(delete=False).name
     if r2 != "None":
         os.system(f"{fastp} -i {r1} -I {r2} -m --merged_out {output} --include_unmerged --detect_adapter_for_pe -q 20 -e 25 -L 30 -c -g -w {threads} --overlap_len_require 20 --overlap_diff_limit 2  >/dev/null 2>&1")
     else:
         os.system(f"{fastp} -i {r1} -o {output} -q 20 -e 25 -L 30 -c -g -w {threads}  >/dev/null 2>&1")
-        
+
     res = (
         map2align(output, "reference/AIRR-V-DNA.fa", threads),
         map2align(output, "reference/AIRR-J-DNA.fa", threads)
-    )    
+    )
     os.system(f'rm -f {output}')
     return res
-        
+
 
 def assignV(rd, refName2Seq):
 
@@ -123,7 +125,7 @@ def assignV(rd, refName2Seq):
     r_pos = rd.reference_start
     r_lgt = len(ref_seq)
 
-    
+
     if (r_lgt - r_pos) - (len(tseq) - start  ) > -10:
         #discard
         return None
@@ -167,7 +169,7 @@ def assignJ(rd, refName2Seq):
 #             "None",
 #             False
 #         )
-    
+
          return Myread(
                 rd.qname,
                 tseq,
@@ -182,15 +184,15 @@ def assignJ(rd, refName2Seq):
 
 #ll: list of pysam AligmentSegmetns
 def TongMing(ll, rev=1):
-    
+
     if len(ll) < 1:
         return []
-    
-    cur = ll[0].qname 
+
+    cur = ll[0].qname
     res = []
-    
+
     for idx in range(0, len(ll)):
-        
+
         if ll[idx].qname != cur:
             res.sort(key = lambda x: x.reference_start * rev)
             yield res
@@ -204,54 +206,54 @@ def TongMing(ll, rev=1):
 #TODO(chensy) 2 round to found potential reads
 #try to avoid error from sequences that have only innerC
 def Extract_Motif(seq, cmotif, fmotif, coffset, foffset, innerC, innerF):
-    
+
     res = 0
     Cx = [ m.end() - coffset for m in re.finditer(cmotif, seq) ]
     Fx = [ m.end() - foffset for m in re.finditer(fmotif, seq) ]
-    
+
     if len(Cx) ==0 and len(Fx) == 0:
         return ("None", 0)
-    
-    if (len(Cx) < 0 ) ^ (len(Fx) < 0):
-        if len(Cx) < 0:
-            Cx = [ m.end() -2 for m in re.finditer(innerC, seq) ]
-        else:
-            Fx = [ m for m in re.finditer(innerF, seq)]
-    
+
+    # if (len(Cx) < 0 ) ^ (len(Fx) < 0):
+    #     if len(Cx) < 0:
+    #         Cx = [ m.end() -2 for m in re.finditer(innerC, seq) ]
+    #     else:
+    #         Fx = [ m for m in re.finditer(innerF, seq)]
+
     for (idx, xc) in enumerate(Cx):
         for xf in Fx:
             if (22 >=xf -xc >= 6 ) and ( idx == len(Cx) -1  or not (32>=xf-Cx[idx+1]>=7)) and not "*" in seq[xc:xf]:
                 return (seq[xc:xf-2], 2)
-            
+
     return ("None", 1)
 
 def Extract_CDR3(seq, cmotif, fmotif, coffset, foffset, innerC, innerF):
-    
+
     res = 0
     Cx = [ m.end() - coffset for m in re.finditer(cmotif, seq) ]
     Fx = [ m.end() - foffset for m in re.finditer(fmotif, seq) ]
-    
+
     if len(Cx) ==0 and len(Fx) == 0:
         return ("None", 0)
-    
+
     if (len(Cx) < 0 ) ^ (len(Fx) < 0):
         if len(Cx) < 0:
             Cx = [ m.end() -2 for m in re.finditer(innerC, seq) ]
         else:
             Fx = [ m for m in re.finditer(innerF, seq)]
-    
+
     for (idx, xc) in enumerate(Cx):
         for xf in Fx:
             if (22 >=xf -xc >= 6 ) and ( idx == len(Cx) -1  or not (32>=xf-Cx[idx+1]>=7)) and not "*" in seq[xc:xf]:
                 return (seq[xc:xf-2], 2)
-            
+
     return ("None", 1)
 
 
 def catt(inp, chain, threads):
-    
+
     vbam, jbam = inp
- 
+
     refName2Seq = {}
     for name in [ "reference/AIRR-V-DNA.fa", "reference/AIRR-J-DNA.fa"]:
         for seq in SeqIO.parse(name, 'fasta'):
@@ -277,7 +279,7 @@ def catt(inp, chain, threads):
     jrs = [ x[0] for x in TongMing(jrs) ]
     #remove reads taht have no contribution to the result
     jrs = list(filter(lambda x: x!= None, map(lambda x: assignJ(x, refName2Seq), jrs)))
-    
+
 
     config = {
         'TRB':{
@@ -285,20 +287,20 @@ def catt(inp, chain, threads):
             "fmotif": "(F|T|Y|H)FG(A|D|E|N|P|Q|S)G",
             "coffset":2,
             "foffset":1,
-            "innerC":"(CAS|CSA|CAW|CAT|CSV|CAI|CAR)",
+            "innerC":"place_holder",
             "innerF":"place_holder",
         },
         'TRA': {
             "cmotif": "[EHILMSTV]{1}Y[FILY]{1}C[AGILV]{1}",
             "fmotif": "(LA|YI|FI|II|LY|LM|PT|TI|LV|ST|VT|LT|LI|LQ|MR|VI|FV|FQ|LF|LL|FE|FT|LS|LN|FY)F((ARG)|(G[A-Z]{1}G))",
-            "coffset": 4,
-            "foffset": 3,
+            "coffset": 2,
+            "foffset": 1,
             "innerC": "place_holder",
             "innerF": "place_holder"
         }
 
-    }    
-    
+    }
+
 
     #### 2. First retrieve
     ####    Find reads that have complete fregments
@@ -310,7 +312,7 @@ def catt(inp, chain, threads):
                 rd.avlb = True
             if res[1] == 2:
                 rd.cdr3 = res[0]
-            
+
     for rd in jrs:
         for aa in tools.TranslateIntoAA(rd.seq):
             res = Extract_Motif(aa, config[chain]['cmotif'], config[chain]['fmotif'], config[chain]['coffset'], config[chain]['foffset'], config[chain]['innerC'], config[chain]['innerF'])
@@ -320,8 +322,8 @@ def catt(inp, chain, threads):
                 rd.cdr3 = res[0]
                 break
 
-    # remove reads that don't have any CDR3 motif        
-    
+    # remove reads that don't have any CDR3 motif
+
     ##### Build kmer table
     cnt = {}
     k = 25
@@ -332,20 +334,20 @@ def catt(inp, chain, threads):
         for i in range( l-k-8, l-k+1 ):
             kmer = seq[i:(i+k)]
             cnt[kmer] = cnt.setdefault(kmer, 0) + 1
-                
+
     for rd in filter(lambda x: x.avlb and len(x.seq) >= 35, jrs):
         seq = rd.seq
         l = len(seq)
         for i in range( 0, min(8+k, l)):
             kmer = seq[i:(i+k)]
             cnt[kmer] = cnt.setdefault(kmer, 0) + 1
-            
+
 ##### Remove reads that span over junction
     vdx, jdx = 0, 0
     final_res = []
     while(vdx < len(vrs) and jdx < len(jrs)):
         if vrs[vdx].name == jrs[jdx].name:
-            
+
             if vrs[vdx].cdr3 != "None" or jrs[jdx].cdr3 != "None":
                 final_res.append((
                     vrs[vdx].vgene,
@@ -354,7 +356,7 @@ def catt(inp, chain, threads):
                 ))
                 vrs[vdx].avlb = False
                 jrs[jdx].avlb = False
-            
+
             vdx = vdx + 1
             jdx = jdx + 1
         elif vrs[vdx].name < jrs[jdx].name:
@@ -363,13 +365,13 @@ def catt(inp, chain, threads):
         else:
             while(jdx < len(jrs) and vrs[vdx].name > jrs[jdx].name ):
                 jdx = jdx + 1
-    #remove      
+    #remove
     vrs = list(filter(lambda x: x.avlb and len(x.seq) >= 35, vrs))
     jrs = list(filter(lambda x: x.avlb and len(x.seq) >= 35, jrs))
 
 
 
-    ####### Build the network, and run MFNC 
+    ####### Build the network, and run MFNC
     G = nx.DiGraph()
     G.add_node('Source', weight = 1)
     G.add_node("Terminal", weight =1 )
@@ -391,7 +393,7 @@ def catt(inp, chain, threads):
         nodes = iter(nodes)
         for x, y in zip(nodes, nodes):
             G.add_edge(x, y, capacity = 102410241024, weight = -cnt[y])
-            
+
     for rd in jrs:
         seq = rd.seq
         l = len(seq)
@@ -418,8 +420,8 @@ def catt(inp, chain, threads):
 
     left_v = [ x for (x, val) in flow_dict['Source'].items() if val > 0 ]
     left_j = [ x for (x, val) in flow_dict_r['Terminal'].items() if val > 0 ]
-    
-    #TODO(chensy) forget reads that partil map ...
+
+    #TODO(chensy) Different of Extract_Motif and Extract_CDR3
     for rd in vrs:
         if rd.name + '_V' not in left_v and rd.cdr3 != 'None':
             final_res.append((rd.vgene, rd.cdr3, 'None'))
@@ -428,8 +430,17 @@ def catt(inp, chain, threads):
             final_res.append(('None', rd.cdr3, rd.jgene))
 
     for rd in left_v:
+       
         res = tools.BuiltPath(tools.FindPath(rd, 'Terminal', flow_dict)[0:-1], v_nodes, j_nodes)
         if res[0] < 2:
+
+            if '*' in res[1]:
+                path = tools.FindPath(rd, 'Terminal', flow_dict)[0:-1]
+                print(v_nodes[path[0]][0])
+                print(path)
+                print(j_nodes[path[-1]][0])
+                continue
+
             for aa in tools.TranslateIntoAA(res[1]):
                 cdr3, code = Extract_Motif(aa, config[chain]['cmotif'], config[chain]['fmotif'], config[chain]['coffset'], config[chain]['foffset'], config[chain]['innerC'], config[chain]['innerF'])
                 if code == 2:
@@ -443,6 +454,7 @@ def catt(inp, chain, threads):
     for rd in left_j:
         res = tools.BuiltPath(tools.FindPath( rd, 'Source', flow_dict_r )[0:-1][::-1], v_nodes, j_nodes)
         if res[0] < 2:
+
             for aa in tools.TranslateIntoAA(res[1]):
                 cdr3, code = Extract_Motif(aa, config[chain]['cmotif'], config[chain]['fmotif'], config[chain]['coffset'], config[chain]['foffset'], config[chain]['innerC'], config[chain]['innerF'])
                 if code  == 2:
@@ -452,7 +464,7 @@ def catt(inp, chain, threads):
                         res[3]
                     ))
                     break
-                    
+
     if len(final_res) > 0:
 
         tab = pd.DataFrame(final_res)
@@ -460,7 +472,7 @@ def catt(inp, chain, threads):
         tab['Vgene'] = tab['Vgene'].apply(lambda x: x.split('*')[0])
         tab['Jgene'] = tab['Jgene'].apply(lambda x: x.split('*')[0])
         tab['counts'] = 1
-        
+
         tab = pd.DataFrame([ (most_common(group['Vgene'], group['counts']), most_common(group['Jgene'], group['counts']), cdr3, sum(group['counts']), 'TRB') for cdr3, group in tab.groupby('CDR3') ], columns = ['Vgene', 'Jgene', 'CDR3', 'Counts', 'Chain'])
         tab = tab[ tab.Counts > 2 ]
         tab['Chain'] = chain
@@ -475,32 +487,36 @@ def CommandLineParser():
     parser.add_argument("--inf",  required=True, help="Input file")
     parser.add_argument("--out",  required=True, help="Output folder")
     parser.add_argument("--threads", type=int, default=2)
-    return parser.parse_args()  
+    return parser.parse_args()
+
+def Protocol(inp):
+
+    r1, r2, sample_id, threads = inp
+
+
+    new_inp = align((r1, r2),      threads)
+    alpha   = catt(new_inp, 'TRA', threads)
+    beta    = catt(new_inp, 'TRB', threads)
+
+
+    tmp = pd.concat([alpha, beta])
+    tmp['CellId'] = sample_id
+
+    os.system(r'rm -f {new_inp}')
+    return tmp
 
 
 if __name__ == "__main__":
-    
+
     args = CommandLineParser()
     args = { arg:getattr(args, arg) for arg in vars(args) }
 
     tab = pd.read_csv(f"{args['inf']}", sep='\t', index_col=0, header=None)
-    res = []
 
-    pool = multiprocessing.Pool(processes = args['threads'] // 4)
+    max_thread  = min( args['threads'], 4)
+    max_workers = max( args['threads'] // 4, 1 )
+    res = process_map(Protocol, [ (row[1], row[2], sample_id, max_thread) for sample_id, row in tab.iterrows() ], max_workers = max_workers, chunksize=16)
 
-    for sample_id, row in tqdm.tqdm(list(tab.iterrows())):
-        r1 = row[1]
-        r2 = row[2]
-        
-        new_inp = align((r1, r2), args['threads'])
-        alpha = catt(new_inp, 'TRA', args['threads'])
-        beta  = catt(new_inp, 'TRB', args['threads'])
-        
-        tmp = pd.concat([alpha, beta])
-        tmp['CellId'] = sample_id
-        
-        res = pd.concat([res, tmp])
-        os.system(r'rm -f {new_inp}')
-    
-    res.to_csv(args['out'], index=False, sep='\t')
+
+    pd.concat(res).to_csv(args['out'], index=False, sep='\t')
 
