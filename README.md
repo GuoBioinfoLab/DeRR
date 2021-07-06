@@ -2,7 +2,7 @@
 
 <img src='DEERR_logo.png' align='right' height=350>
 
-## What is **DERR
+## What is **DERR**
 
 DERR (Detection Dual T-cell receptor in single cell sequencing) is a toolkit for:
 
@@ -12,13 +12,13 @@ DERR (Detection Dual T-cell receptor in single cell sequencing) is a toolkit for
 
 # Overview
 
-- HomePage: [http://bioinfo.life.hust.edu.cn/CATT](http://bioinfo.life.hust.edu.cn/CATT/Homepage.html)
-- Github: [https://github.com/GuoBioinfoLab/CATT](https://github.com/GuoBioinfoLab/CATT)
+- HomePage: [http://bioinfo.life.hust.edu.cn/DeRR]
+- Github: [https://github.com/GuoBioinfoLab/DeRR]
 - For detials please see our [Bioinformatics publication](!https://doi.org/10.1093/bioinformatics/btaa432)
 
 # Installation
 
-DeRR required follwing packages:
+DeRR required follwing python packages:
 
 * tqdm
 * pandas 
@@ -32,6 +32,28 @@ Users could using `pip` or others package managers to install these packages lik
 pip install tqdm pandas biopython pysam networkx
 ```
 
+Follwing tools are also required:
+
+* bwa
+* samtools
+* fastp
+
+We recommand using a vitrual conda envoriment to install above packages and softwares:
+
+```
+# Create the envroiment and install the requirments
+conda create -c conda-forge -c bioconda -n deer tqdm pandas biopython pysam networkx bwa samtools fastp -y
+
+# As sometimes conda might be very slow, users could use mamba instead of conda for faster installation
+conda install -n base -c conda-forge mamba #install mamba
+mamba create -c conda-forge -c bioconda -n deer tqdm pandas biopython pysam networkx bwa samtools fastp -y #install requirments
+
+
+# Activate the envoriment
+conda activate deer
+# Do some analysis
+python DeRR.py --inf XXX --out XXX --threads 4
+```
 
 
 # Usage
@@ -39,7 +61,7 @@ pip install tqdm pandas biopython pysam networkx
 Typical DERR command for extraction Dual TCR will look like:
 
 ```
-python DERR.py --inf /path/to/manifest.tsv --out /path/to/result.tsv --threads X
+python DeRR.py --inf /path/to/manifest.tsv --out /path/to/result.tsv --threads X
 ```
 
 Users should list all the FASTQ files and Cell IDS in the manifest file. The manifest file should contain 3 tab-seprated columsn like
