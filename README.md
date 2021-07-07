@@ -40,7 +40,7 @@ Follwing tools are also required:
 
 We recommand using a vitrual conda envoriment to install above packages and softwares:
 
-```
+```Shell
 # Create the envroiment and install the requirments
 conda create -c conda-forge -c bioconda -n deer tqdm pandas biopython pysam networkx bwa samtools fastp -y
 
@@ -60,11 +60,11 @@ python DeRR.py --inf XXX --out XXX --threads 4
 
 Typical DERR command for extraction Dual TCR will look like:
 
-```
+```Shell
 python DeRR.py --inf /path/to/manifest.tsv --out /path/to/result.tsv --threads X
 ```
 
-Users should list all the FASTQ files and Cell IDS in the manifest file. The manifest file should contain 3 tab-seprated columsn like
+Users should list all the FASTQ files and Cell IDs (barcode) in the manifest file. The manifest file should contain 3 tab-seprated columsn like
 
 ```
 #For paired-end reads
@@ -73,9 +73,10 @@ Read1-file-name \t Read2-file-name \t Cell-id
 Read1-file-name \t None \t Cell-id
 ```
 
-For data format like **10X V(D)J** that do not provide FASTQ files for each cell,  we provide a script to help demulpitexing the data:
+For **10X V(D)J** sequencing data which don't provide FASTQ files for each cell, we provide a script help demulpitexing the data:
 
 ```
-python Split4bam.py --in --out 
+python SplitVDJbam.py --bam all_contig.bam --list cell_barcodes.json --out /path/to/fastq_output --file /path/to/Manifest.tsv
 ```
+where `all_contig.bam` and `cell_barcodes.json` is the output from cellranger, usually located in `ProjectName/outs`
 

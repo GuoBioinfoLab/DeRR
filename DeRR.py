@@ -7,13 +7,129 @@ import time
 import pysam
 from tqdm.contrib.concurrent import process_map
 import re
-import tools
 import networkx as nx
 from tempfile import TemporaryFile, NamedTemporaryFile
-import multiprocessing
+import editdistance
 
 def selfLog(msg):
     print(time.ctime(time.time()) + "]     %s" % msg)
+
+AAcode = {'TTT': 'F',
+ 'TTC': 'F',
+ 'TTA': 'L',
+ 'TTG': 'L',
+ 'TCT': 'S',
+ 'TCC': 'S',
+ 'TCA': 'S',
+ 'TCG': 'S',
+ 'TAT': 'Y',
+ 'TAC': 'Y',
+ 'TAA': '*',
+ 'TAG': '*',
+ 'TGT': 'C',
+ 'TGC': 'C',
+ 'TGA': '*',
+ 'TGG': 'W',
+ 'CTT': 'L',
+ 'CTC': 'L',
+ 'CTA': 'L',
+ 'CTG': 'L',
+ 'CCT': 'P',
+ 'CCC': 'P',
+ 'CCA': 'P',
+ 'CCG': 'P',
+ 'CAT': 'H',
+ 'CAC': 'H',
+ 'CAA': 'Q',
+ 'CAG': 'Q',
+ 'CGT': 'R',
+ 'CGC': 'R',
+ 'CGA': 'R',
+ 'CGG': 'R',
+ 'ATT': 'I',
+ 'ATC': 'I',
+ 'ATA': 'I',
+ 'ATG': 'M',
+ 'ACT': 'T',
+ 'ACC': 'T',
+ 'ACA': 'T',
+ 'ACG': 'T',
+ 'AAT': 'N',
+ 'AAC': 'N',
+ 'AAA': 'K',
+ 'AAG': 'K',
+ 'AGT': 'S',
+ 'AGC': 'S',
+ 'AGA': 'R',
+ 'AGG': 'R',
+ 'GTT': 'V',
+ 'GTC': 'V',
+ 'GTA': 'V',
+ 'GTG': 'V',
+ 'GCT': 'A',
+ 'GCC': 'A',
+ 'GCA': 'A',
+ 'GCG': 'A',
+ 'GAT': 'D',
+ 'GAC': 'D',
+ 'GAA': 'E',
+ 'GAG': 'E',
+ 'GGT': 'G',
+ 'GGC': 'G',
+ 'GGA': 'G',
+ 'GGG': 'G'}
+
+def BreakSeqIntoAAcodes(seq, frame, n):
+
+    return ''.join([AAcode[seq[i:i+3]] for i in range(frame, n, 3)])
+
+def TranslateIntoAA(seq):
+
+    n = len(seq)    
+    return [ BreakSeqIntoAAcodes(seq, ff, n-(n-ff)%3) for ff in [0, 1, 2] ]
+
+def FindPath(cur, term, G):
+    path = [cur]
+    while True:
+        cur = path[-1]
+        if cur == term:
+            return path
+        for node, val in G[cur].items():
+            if val > 0:
+                path.append( node )
+                break
+        else:
+            path.pop()
+            if len(path) == 0:
+                break
+
+def BuiltPath(path, v_nodes, j_nodes, k=25):
+
+    v = v_nodes[ path[0]  ][0]
+    j = j_nodes[ path[-1] ][0]
+    
+    v_pos = v.find(path[1])
+    j_pos = j.find(path[-2])
+    segment = path[1] + "".join([ kmer[-1] for kmer in path[2:-1] ])
+    
+    total_len = (v_pos-j_pos+len(segment)-k) + len(j)
+    fill_v = v[0:v_pos] + segment + '*'*(total_len - len(segment) - v_pos)
+    fill_j = '*'*(total_len - len(j)) + j
+    
+    res = 0
+    merged_seq = []
+    for idx in range(len(fill_v)):
+        merged_seq.append( fill_v[idx] if fill_v[idx] != '*' else fill_j[idx] )
+        if fill_v[idx] == '*' or fill_j[idx] == '*':
+            continue
+        else:
+            if fill_v[idx] != fill_j[idx]:
+                res = res + 1
+                if res > 1:
+                    break
+            
+            
+    return (res, "".join(merged_seq), v_nodes[ path[0] ][1], j_nodes[ path[-1] ][1])
 
 
 class Myread(object):
@@ -96,6 +212,34 @@ def most_common(vals, cnts):
     else:
         return 'None'
 
+def Correct(group):
+    
+    for idx in range(0, 100):
+        
+        if idx >= group.shape[0]:
+            continue
+    
+        seq   = list(group['CDR3'])[idx]
+        cnt   = list(group['Counts'])[idx]
+        vgene = list(group['Vgene'])[idx]
+        jgene = list(group['Jgene'])[idx]
+
+        remove = group[ (group['CDR3'].apply(lambda x: editdistance.eval(x, seq) <= 3)) ]
+
+        if remove.shape[0] < 2:
+            continue
+
+        #Counts
+        group.iloc[idx, 3] = cnt + sum(group.loc[remove.index[1:], 'Counts'])
+        if vgene == 'None':
+            group.iloc[idx, 0] = most_common(remove['Vgene'], remove['Counts'])
+        if jgene == 'None':
+            group.iloc[idx, 0] = most_common(remove['Jgene'], remove['Counts'])
+
+        group.drop(remove.index[1:], inplace=True)
+
+    return group
+
 def align(inp, threads=1):
 
     ##### QC
@@ -104,13 +248,13 @@ def align(inp, threads=1):
 
     output = NamedTemporaryFile(delete=False).name
     if r2 != "None":
-        os.system(f"{fastp} -i {r1} -I {r2} -m --merged_out {output} --include_unmerged --detect_adapter_for_pe -q 20 -e 25 -L 30 -c -g -w {threads} --overlap_len_require 20 --overlap_diff_limit 2  >/dev/null 2>&1")
+        os.system(f"{fastp} -i {r1} -I {r2} -m --merged_out {output} --include_unmerged --detect_adapter_for_pe -q 20 -e 25 -L 30 -c -g -w {threads} -h /dev/null -j /dev/null --overlap_len_require 20 --overlap_diff_limit 2  >/dev/null 2>&1")
     else:
-        os.system(f"{fastp} -i {r1} -o {output} -q 20 -e 25 -L 30 -c -g -w {threads}  >/dev/null 2>&1")
+        os.system(f"{fastp} -i {r1} -o {output} -q 20 -e 25 -L 30 -c -g -w {threads} -h /dev/null -j /dev/null  >/dev/null 2>&1")
 
     res = (
-        map2align(output, "reference/AIRR-V-DNA.fa", threads),
-        map2align(output, "reference/AIRR-J-DNA.fa", threads)
+        map2align(output, "/home/chensy/Dual/0.Script/deer/reference/AIRR-V-DNA.fa", threads),
+        map2align(output, "/home/chensy/Dual/0.Script/deer/reference/AIRR-J-DNA.fa", threads)
     )
     os.system(f'rm -f {output}')
     return res
@@ -255,7 +399,7 @@ def catt(inp, chain, threads):
     vbam, jbam = inp
 
     refName2Seq = {}
-    for name in [ "reference/AIRR-V-DNA.fa", "reference/AIRR-J-DNA.fa"]:
+    for name in [ "/home/chensy/Dual/0.Script/deer/reference/AIRR-V-DNA.fa", "/home/chensy/Dual/0.Script/deer/reference/AIRR-J-DNA.fa"]:
         for seq in SeqIO.parse(name, 'fasta'):
             refName2Seq[ seq.id ] = str(seq.seq).upper()
 
@@ -306,7 +450,7 @@ def catt(inp, chain, threads):
     ####    Find reads that have complete fregments
 
     for rd in vrs:
-        for aa in tools.TranslateIntoAA(rd.seq):
+        for aa in TranslateIntoAA(rd.seq):
             res = Extract_Motif(aa, config[chain]['cmotif'], config[chain]['fmotif'], config[chain]['coffset'], config[chain]['foffset'], config[chain]['innerC'], config[chain]['innerF'])
             if res[1] > 0:
                 rd.avlb = True
@@ -314,7 +458,7 @@ def catt(inp, chain, threads):
                 rd.cdr3 = res[0]
 
     for rd in jrs:
-        for aa in tools.TranslateIntoAA(rd.seq):
+        for aa in TranslateIntoAA(rd.seq):
             res = Extract_Motif(aa, config[chain]['cmotif'], config[chain]['fmotif'], config[chain]['coffset'], config[chain]['foffset'], config[chain]['innerC'], config[chain]['innerF'])
             if res[1] > 0:
                 rd.avlb = True
@@ -327,18 +471,19 @@ def catt(inp, chain, threads):
     ##### Build kmer table
     cnt = {}
     k = 25
+    kmer_offset = 5
 
     for rd in filter(lambda x: x.avlb and len(x.seq) >= 35, vrs):
         seq = rd.seq
         l = len(seq)
-        for i in range( l-k-8, l-k+1 ):
+        for i in range( l-k-kmer_offset, l-k+1 ):
             kmer = seq[i:(i+k)]
             cnt[kmer] = cnt.setdefault(kmer, 0) + 1
 
     for rd in filter(lambda x: x.avlb and len(x.seq) >= 35, jrs):
         seq = rd.seq
         l = len(seq)
-        for i in range( 0, min(8+k, l)):
+        for i in range( 0, min(kmer_offset + k, l)):
             kmer = seq[i:(i+k)]
             cnt[kmer] = cnt.setdefault(kmer, 0) + 1
 
@@ -384,7 +529,7 @@ def catt(inp, chain, threads):
         l = len(seq)
         rd_node = rd.name + '_V'
         v_nodes[rd_node] = (rd.seq, rd.vgene)
-        nodes = [ seq[i:(i+k)] for i in range(l-k-8, l-k+1) ]
+        nodes = [ seq[i:(i+k)] for i in range(l-k-kmer_offset, l-k+1) ]
         G.add_node(rd_node)
         G.add_edge('Source', rd_node, capacity=1, weight=1)
         for node in nodes:
@@ -399,7 +544,7 @@ def catt(inp, chain, threads):
         l = len(seq)
         rd_node = rd.name + '_J'
         j_nodes[rd_node] = (rd.seq, rd.jgene)
-        nodes = [ seq[i:(i+k)] for i in range( 0, min(8, l-k+1)) ]
+        nodes = [ seq[i:(i+k)] for i in range( 0, min(kmer_offset, l-k+1)) ]
         G.add_node(rd_node)
         G.add_edge(rd_node, 'Terminal',  capacity = 10241024, weight=1)
         for node in nodes:
@@ -429,19 +574,16 @@ def catt(inp, chain, threads):
         if rd.name + '_J' not in left_j and rd.cdr3 != 'None':
             final_res.append(('None', rd.cdr3, rd.jgene))
 
+
+    repeat_list = []
+    reduce_list = {}
+
     for rd in left_v:
        
-        res = tools.BuiltPath(tools.FindPath(rd, 'Terminal', flow_dict)[0:-1], v_nodes, j_nodes)
+        res = BuiltPath(FindPath(rd, 'Terminal', flow_dict)[0:-1], v_nodes, j_nodes)
         if res[0] < 2:
 
-            if '*' in res[1]:
-                path = tools.FindPath(rd, 'Terminal', flow_dict)[0:-1]
-                print(v_nodes[path[0]][0])
-                print(path)
-                print(j_nodes[path[-1]][0])
-                continue
-
-            for aa in tools.TranslateIntoAA(res[1]):
+            for aa in TranslateIntoAA(res[1]):
                 cdr3, code = Extract_Motif(aa, config[chain]['cmotif'], config[chain]['fmotif'], config[chain]['coffset'], config[chain]['foffset'], config[chain]['innerC'], config[chain]['innerF'])
                 if code == 2:
                     final_res.append((
@@ -449,13 +591,13 @@ def catt(inp, chain, threads):
                         cdr3,
                         res[3]
                     ))
+                    repeat_list.append(rd[0:-2])
                     break
 
     for rd in left_j:
-        res = tools.BuiltPath(tools.FindPath( rd, 'Source', flow_dict_r )[0:-1][::-1], v_nodes, j_nodes)
+        res = BuiltPath(FindPath( rd, 'Source', flow_dict_r )[0:-1][::-1], v_nodes, j_nodes)
         if res[0] < 2:
-
-            for aa in tools.TranslateIntoAA(res[1]):
+            for aa in TranslateIntoAA(res[1]):
                 cdr3, code = Extract_Motif(aa, config[chain]['cmotif'], config[chain]['fmotif'], config[chain]['coffset'], config[chain]['foffset'], config[chain]['innerC'], config[chain]['innerF'])
                 if code  == 2:
                     final_res.append((
@@ -463,6 +605,8 @@ def catt(inp, chain, threads):
                         cdr3,
                         res[3]
                     ))
+                    if rd[0:-2] in repeat_list:
+                        reduce_list[cdr3] = reduce_list.setdefault(cdr3, 0 ) + 1
                     break
 
     if len(final_res) > 0:
@@ -474,11 +618,13 @@ def catt(inp, chain, threads):
         tab['counts'] = 1
 
         tab = pd.DataFrame([ (most_common(group['Vgene'], group['counts']), most_common(group['Jgene'], group['counts']), cdr3, sum(group['counts']), 'TRB') for cdr3, group in tab.groupby('CDR3') ], columns = ['Vgene', 'Jgene', 'CDR3', 'Counts', 'Chain'])
+        for seq, val in reduce_list.items():
+            tab.loc[ tab.CDR3 == seq, 'Counts' ] = tab.loc[ tab.CDR3 == seq, 'Counts' ] - val
         tab = tab[ tab.Counts > 2 ]
         tab['Chain'] = chain
 
         #TODO(chensy) change some here
-        return tab
+        return Correct(tab.sort_values('Counts', ascending=False))
     else:
         return pd.DataFrame(columns = ['Vgene', 'Jgene', 'CDR3', 'Counts', 'Chain'])
 
@@ -497,7 +643,6 @@ def Protocol(inp):
     new_inp = align((r1, r2),      threads)
     alpha   = catt(new_inp, 'TRA', threads)
     beta    = catt(new_inp, 'TRB', threads)
-
 
     tmp = pd.concat([alpha, beta])
     tmp['CellId'] = sample_id
