@@ -10,6 +10,7 @@ import re
 import networkx as nx
 from tempfile import TemporaryFile, NamedTemporaryFile
 import editdistance
+import sys
 
 def selfLog(msg):
     print(time.ctime(time.time()) + "]     %s" % msg)
@@ -85,7 +86,7 @@ def BreakSeqIntoAAcodes(seq, frame, n):
 
 def TranslateIntoAA(seq):
 
-    n = len(seq)    
+    n = len(seq)
     return [ BreakSeqIntoAAcodes(seq, ff, n-(n-ff)%3) for ff in [0, 1, 2] ]
 
 def FindPath(cur, term, G):
@@ -107,15 +108,15 @@ def BuiltPath(path, v_nodes, j_nodes, k=25):
 
     v = v_nodes[ path[0]  ][0]
     j = j_nodes[ path[-1] ][0]
-    
+
     v_pos = v.find(path[1])
     j_pos = j.find(path[-2])
     segment = path[1] + "".join([ kmer[-1] for kmer in path[2:-1] ])
-    
+
     total_len = (v_pos-j_pos+len(segment)-k) + len(j)
     fill_v = v[0:v_pos] + segment + '*'*(total_len - len(segment) - v_pos)
     fill_j = '*'*(total_len - len(j)) + j
-    
+
     res = 0
     merged_seq = []
     for idx in range(len(fill_v)):
@@ -127,8 +128,8 @@ def BuiltPath(path, v_nodes, j_nodes, k=25):
                 res = res + 1
                 if res > 1:
                     break
-            
-            
+
+
     return (res, "".join(merged_seq), v_nodes[ path[0] ][1], j_nodes[ path[-1] ][1])
 
 
@@ -190,13 +191,8 @@ def map2align(inp, ref, threads):
     samtools = "samtools"
 
     sam_file = NamedTemporaryFile(delete=False).name
-    #os.system(f"{bwa} mem  -t {threads} -k 10 -A 1 -B 2 -L 0 -T 17 -v 0 {ref} {inp} 2>/dev/null | {samtools} view -bSh -F 2308 - 2>/dev/null | {samtools} sort -n -o - - > {sam_file} 2>/dev/null")os.system(f"{bwa} mem  -t {threads} -k 10 -A 1 -B 2 -L 0 -T 17 -v 0 {ref} {inp} 2>/dev/null | {samtools} view -bSh -F 2308 - | {samtools} sort -n -o - - > {sam_file}")
     os.system(f"{bwa} mem  -t {threads} -k 10 -A 1 -B 2 -L 0 -T 17 -v 0 {ref} {inp} 2>/dev/null | {samtools} view -Sh -F 2308 - 2>/dev/null > {sam_file}")
-    #os.system(f"{bwa} mem  -t {threads} -k 10 -A 1 -B 2 -L 0 -T 17 -v 0 {ref} {inp} 2>/dev/null | {samtools} view -bSh -F 2308 - 2>/dev/null | {samtools} sort -n - {sam_file} 2>/dev/null")
     #os.system(f"{bwa} mem  -t {threads} -k 10 -A 1 -B 2 -L 0 -T 17 -v 0 {ref} {inp} | {samtools} view -Sh -F 2308 - > {sam_file}")
-
-    #bwa mem -v 1 -t 4 -k 8 -A 1 -B 2 -L 0 -T 17 ../reference/TRB/TRBV-gai6-DNA.fa ../10xTCR_testSample/TTTCCTCCAATACGCT-1.fastq | samtools view -Sh -F 2308 - > 10XV.sam
-    #bwa mem -v 1 -t 4 -k 8 -A 1 -B 2 -L 0 -T 17 ../reference/TRB/TRBV-gai6-DNA.fa /workspace/chensy/dual/1.Data/liver/Sample_PD10_ZZM_TTS98-0205.1.clean.fq /workspace/chensy/dual/1.Data/liver/Sample_PD10_ZZM_TTS98-0205.2.clean.fq | samtools view -Sh -F 2308 - > SmartV.sam
 
     return sam_file
 
@@ -213,12 +209,12 @@ def most_common(vals, cnts):
         return 'None'
 
 def Correct(group):
-    
+
     for idx in range(0, 100):
-        
+
         if idx >= group.shape[0]:
             continue
-    
+
         seq   = list(group['CDR3'])[idx]
         cnt   = list(group['Counts'])[idx]
         vgene = list(group['Vgene'])[idx]
@@ -252,9 +248,10 @@ def align(inp, threads=1):
     else:
         os.system(f"{fastp} -i {r1} -o {output} -q 20 -e 25 -L 30 -c -g -w {threads} -h /dev/null -j /dev/null  >/dev/null 2>&1")
 
+    prefix = os.path.realpath(sys.argv[0]).replace(sys.argv[0], "")
     res = (
-        map2align(output, "/home/chensy/Dual/0.Script/deer/reference/AIRR-V-DNA.fa", threads),
-        map2align(output, "/home/chensy/Dual/0.Script/deer/reference/AIRR-J-DNA.fa", threads)
+        map2align(output, f"{prefix}reference/AIRR-V-DNA.fa", threads),
+        map2align(output, f"{prefix}reference/AIRR-J-DNA.fa", threads)
     )
     os.system(f'rm -f {output}')
     return res
@@ -399,7 +396,8 @@ def catt(inp, chain, threads):
     vbam, jbam = inp
 
     refName2Seq = {}
-    for name in [ "/home/chensy/Dual/0.Script/deer/reference/AIRR-V-DNA.fa", "/home/chensy/Dual/0.Script/deer/reference/AIRR-J-DNA.fa"]:
+    prefix = os.path.realpath(sys.argv[0]).replace(sys.argv[0], "")
+    for name in [ f"{prefix}reference/AIRR-V-DNA.fa", f"{prefix}reference/AIRR-J-DNA.fa"]:
         for seq in SeqIO.parse(name, 'fasta'):
             refName2Seq[ seq.id ] = str(seq.seq).upper()
 
@@ -408,7 +406,6 @@ def catt(inp, chain, threads):
         vrs = [ rd for rd in pysam.AlignmentFile(vbam, 'r') if chain in rd.reference_name ]
     except:
          vrs = []
-    #TODO(chensy) using samtools sort to skip this step
     vrs.sort(key = lambda x: x.qname)
     vrs = [ x[0] for x in TongMing(vrs, -1) ]
     vrs = list(filter(lambda x: x!= None, map(lambda x: assignV(x, refName2Seq), vrs)))
@@ -419,7 +416,6 @@ def catt(inp, chain, threads):
     except:
         jrs = []
     jrs.sort(key = lambda x: x.qname)
-    #remove paired reads that map to same Gene
     jrs = [ x[0] for x in TongMing(jrs) ]
     #remove reads taht have no contribution to the result
     jrs = list(filter(lambda x: x!= None, map(lambda x: assignJ(x, refName2Seq), jrs)))
@@ -579,7 +575,7 @@ def catt(inp, chain, threads):
     reduce_list = {}
 
     for rd in left_v:
-       
+
         res = BuiltPath(FindPath(rd, 'Terminal', flow_dict)[0:-1], v_nodes, j_nodes)
         if res[0] < 2:
 
@@ -653,15 +649,23 @@ def Protocol(inp):
 
 if __name__ == "__main__":
 
+    selfLog("Program start")
+
     args = CommandLineParser()
     args = { arg:getattr(args, arg) for arg in vars(args) }
+
+    selfLog("Loading Manifest file")
 
     tab = pd.read_csv(f"{args['inf']}", sep='\t', index_col=0, header=None)
 
     max_thread  = min( args['threads'], 4)
     max_workers = max( args['threads'] // 4, 1 )
+
+    selfLog("Start detecting TCR")
     res = process_map(Protocol, [ (row[1], row[2], sample_id, max_thread) for sample_id, row in tab.iterrows() ], max_workers = max_workers, chunksize=16)
+    selfLog("Detection end")
 
 
     pd.concat(res).to_csv(args['out'], index=False, sep='\t')
+    selfLog("Program end")
 
