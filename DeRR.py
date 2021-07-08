@@ -8,6 +8,8 @@ import pysam
 from tqdm.contrib.concurrent import process_map
 import re
 import networkx as nx
+import string
+import random
 from tempfile import TemporaryFile, NamedTemporaryFile
 import editdistance
 import sys
@@ -190,12 +192,14 @@ def map2align(inp, ref, threads):
     bwa = "bwa"
     samtools = "samtools"
 
-    sam_file = NamedTemporaryFile(delete=False).name
-    os.system(f"{bwa} mem  -t {threads} -k 10 -A 1 -B 2 -L 0 -T 17 -v 0 {ref} {inp} 2>/dev/null | {samtools} view -Sh -F 2308 - 2>/dev/null > {sam_file}")
-    #os.system(f"{bwa} mem  -t {threads} -k 10 -A 1 -B 2 -L 0 -T 17 -v 0 {ref} {inp} | {samtools} view -Sh -F 2308 - > {sam_file}")
-
-    return sam_file
-
+    prefix = os.path.realpath(sys.argv[0]).replace("DeRR.py", "")
+    sam_file = prefix + ''.join(random.choices(string.ascii_uppercase + string.digits, k=10))
+    bam_file = prefix + ''.join(random.choices(string.ascii_uppercase + string.digits, k=10))
+    #os.system(f"{bwa} mem  -t {threads} -k 10 -A 1 -B 2 -L 0 -T 17 -v 0 {ref} {inp} 2>/dev/null | {samtools} view -Sh -F 2308 - 2>/dev/null > {sam_file}")    
+    os.system(f"{bwa} mem -t {threads} -k 10 -A 1 -B 2 -L 0 -T 17 -v 0 {ref} {inp} 2>/dev/null > {sam_file}")
+    os.system(f"{samtools} view -Sh -F 2308 {sam_file} 2>/dev/null > {bam_file} && rm {sam_file}")
+    return bam_file
+   
 def most_common(vals, cnts):
     total = {}
     for (val, cnt) in zip(vals, cnts):
@@ -220,7 +224,7 @@ def Correct(group):
         vgene = list(group['Vgene'])[idx]
         jgene = list(group['Jgene'])[idx]
 
-        remove = group[ (group['CDR3'].apply(lambda x: editdistance.eval(x, seq) <= 3)) ]
+        remove = group[ (group['CDR3'].apply(lambda x: editdistance.eval(x, seq) <= len(seq) // 6 )) ]
 
         if remove.shape[0] < 2:
             continue
@@ -242,13 +246,14 @@ def align(inp, threads=1):
     fastp = 'fastp'
     r1, r2 = inp
 
-    output = NamedTemporaryFile(delete=False).name
+    prefix = os.path.realpath(sys.argv[0]).replace("DeRR.py", "")
+    output = prefix + ''.join(random.choices(string.ascii_uppercase + string.digits, k=10))
     if r2 != "None":
         os.system(f"{fastp} -i {r1} -I {r2} -m --merged_out {output} --include_unmerged --detect_adapter_for_pe -q 20 -e 25 -L 30 -c -g -w {threads} -h /dev/null -j /dev/null --overlap_len_require 20 --overlap_diff_limit 2  >/dev/null 2>&1")
     else:
         os.system(f"{fastp} -i {r1} -o {output} -q 20 -e 25 -L 30 -c -g -w {threads} -h /dev/null -j /dev/null  >/dev/null 2>&1")
 
-    prefix = os.path.realpath(sys.argv[0]).replace(sys.argv[0], "")
+    
     res = (
         map2align(output, f"{prefix}reference/AIRR-V-DNA.fa", threads),
         map2align(output, f"{prefix}reference/AIRR-J-DNA.fa", threads)
@@ -396,7 +401,7 @@ def catt(inp, chain, threads):
     vbam, jbam = inp
 
     refName2Seq = {}
-    prefix = os.path.realpath(sys.argv[0]).replace(sys.argv[0], "")
+    prefix = os.path.realpath(sys.argv[0]).replace("DeRR.py", "")
     for name in [ f"{prefix}reference/AIRR-V-DNA.fa", f"{prefix}reference/AIRR-J-DNA.fa"]:
         for seq in SeqIO.parse(name, 'fasta'):
             refName2Seq[ seq.id ] = str(seq.seq).upper()
@@ -643,7 +648,7 @@ def Protocol(inp):
     tmp = pd.concat([alpha, beta])
     tmp['CellId'] = sample_id
 
-    os.system(r'rm -f {new_inp}')
+    os.system(r'rm -f {new_inp[0]} {new_inp[1]}')
     return tmp
 
 
@@ -662,7 +667,7 @@ if __name__ == "__main__":
     max_workers = max( args['threads'] // 4, 1 )
 
     selfLog("Start detecting TCR")
-    res = process_map(Protocol, [ (row[1], row[2], sample_id, max_thread) for sample_id, row in tab.iterrows() ], max_workers = max_workers, chunksize=16)
+    res = process_map(Protocol, [ (row[1], row[2], sample_id, max_thread) for sample_id, row in tab.iterrows() ], max_workers = max_workers, chunksize=2)
     selfLog("Detection end")
 
 
