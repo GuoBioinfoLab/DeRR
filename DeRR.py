@@ -193,13 +193,15 @@ def map2align(inp, ref, threads):
     samtools = "samtools"
 
     prefix = os.path.realpath(sys.argv[0]).replace("DeRR.py", "")
-    sam_file = prefix + ''.join(random.choices(string.ascii_uppercase + string.digits, k=10))
-    bam_file = prefix + ''.join(random.choices(string.ascii_uppercase + string.digits, k=10))
-    #os.system(f"{bwa} mem  -t {threads} -k 10 -A 1 -B 2 -L 0 -T 17 -v 0 {ref} {inp} 2>/dev/null | {samtools} view -Sh -F 2308 - 2>/dev/null > {sam_file}")    
+    sam_file = prefix + "temporary/"+ ''.join(random.choices(string.ascii_uppercase + string.digits, k=10)) + '.tmp'
+    bam_file = prefix + "temporary/" + ''.join(random.choices(string.ascii_uppercase + string.digits, k=10)) + '.tmp'
+    #os.system(f"{bwa} mem  -t {threads} -k 10 -A 1 -B 2 -L 0 -T 17 -v 0 {ref} {inp} 2>/dev/null | {samtools} view -Sh -F 2308 - 2>/dev/null > {sam_file}")
     os.system(f"{bwa} mem -t {threads} -k 10 -A 1 -B 2 -L 0 -T 17 -v 0 {ref} {inp} 2>/dev/null > {sam_file}")
-    os.system(f"{samtools} view -Sh -F 2308 {sam_file} 2>/dev/null > {bam_file} && rm {sam_file}")
+    os.system(f"{samtools} view -Sh -F 2308 {sam_file} 2>/dev/null > {bam_file}")
+    print(f"rm -f {sam_file}")
+    os.system(f"rm -f {sam_file}")
     return bam_file
-   
+
 def most_common(vals, cnts):
     total = {}
     for (val, cnt) in zip(vals, cnts):
@@ -247,17 +249,19 @@ def align(inp, threads=1):
     r1, r2 = inp
 
     prefix = os.path.realpath(sys.argv[0]).replace("DeRR.py", "")
-    output = prefix + ''.join(random.choices(string.ascii_uppercase + string.digits, k=10))
+    os.system(f"mkdir -p {prefix}/temporary")
+    output = prefix + "temporary/" + ''.join(random.choices(string.ascii_uppercase + string.digits, k=10)) + '.tmp'
     if r2 != "None":
         os.system(f"{fastp} -i {r1} -I {r2} -m --merged_out {output} --include_unmerged --detect_adapter_for_pe -q 20 -e 25 -L 30 -c -g -w {threads} -h /dev/null -j /dev/null --overlap_len_require 20 --overlap_diff_limit 2  >/dev/null 2>&1")
     else:
         os.system(f"{fastp} -i {r1} -o {output} -q 20 -e 25 -L 30 -c -g -w {threads} -h /dev/null -j /dev/null  >/dev/null 2>&1")
 
-    
+
     res = (
         map2align(output, f"{prefix}reference/AIRR-V-DNA.fa", threads),
         map2align(output, f"{prefix}reference/AIRR-J-DNA.fa", threads)
     )
+    print(f'rm -f {output}')
     os.system(f'rm -f {output}')
     return res
 
@@ -648,7 +652,7 @@ def Protocol(inp):
     tmp = pd.concat([alpha, beta])
     tmp['CellId'] = sample_id
 
-    os.system(r'rm -f {new_inp[0]} {new_inp[1]}')
+    os.system(f"rm -f {new_inp[0]} {new_inp[1]}")
     return tmp
 
 
