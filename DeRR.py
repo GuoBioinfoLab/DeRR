@@ -10,7 +10,6 @@ import re
 import networkx as nx
 import string
 import random
-from tempfile import TemporaryFile, NamedTemporaryFile
 import editdistance
 import sys
 
@@ -198,7 +197,6 @@ def map2align(inp, ref, threads):
     #os.system(f"{bwa} mem  -t {threads} -k 10 -A 1 -B 2 -L 0 -T 17 -v 0 {ref} {inp} 2>/dev/null | {samtools} view -Sh -F 2308 - 2>/dev/null > {sam_file}")
     os.system(f"{bwa} mem -t {threads} -k 10 -A 1 -B 2 -L 0 -T 17 -v 0 {ref} {inp} 2>/dev/null > {sam_file}")
     os.system(f"{samtools} view -Sh -F 2308 {sam_file} 2>/dev/null > {bam_file}")
-    print(f"rm -f {sam_file}")
     os.system(f"rm -f {sam_file}")
     return bam_file
 
@@ -261,7 +259,6 @@ def align(inp, threads=1):
         map2align(output, f"{prefix}reference/AIRR-V-DNA.fa", threads),
         map2align(output, f"{prefix}reference/AIRR-J-DNA.fa", threads)
     )
-    print(f'rm -f {output}')
     os.system(f'rm -f {output}')
     return res
 
@@ -643,7 +640,6 @@ def CommandLineParser():
 def Protocol(inp):
 
     r1, r2, sample_id, threads = inp
-
 
     new_inp = align((r1, r2),      threads)
     alpha   = catt(new_inp, 'TRA', threads)
