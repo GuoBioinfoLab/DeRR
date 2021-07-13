@@ -1,8 +1,8 @@
 # DeRR
 
-<img src='DEERR_logo.png' align='right' height=350>
+<img src='./DEERR_logo.png' align='right' height=350>
 
-## What is **DERR**
+### What is **DERR**
 
 DERR (Detection Dual T-cell receptor in single cell sequencing) is a toolkit for:
 
