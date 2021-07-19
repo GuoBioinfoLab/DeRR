@@ -69,9 +69,11 @@ Users should list all the FASTQ files and Cell IDs (barcode) in the **manifest**
 
 ```
 #For paired-end reads
-Read1-file-name \t Read2-file-name \t Cell-id
+Cell-id\tRead1-file-name\tRead2-file-name\n
+#(Option)give output path for each cell in last row like
+#Cell-id\tRead1-file-name\tRead2-file-name\Path-Output\n
 #For single-end reads
-Read1-file-name \t None \t Cell-id
+Cell-id\tRead1-file-name\tNone\n
 ```
 
 A  manifest file is like:
