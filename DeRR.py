@@ -90,14 +90,18 @@ def TranslateIntoAA(seq):
     n = len(seq)
     return [ BreakSeqIntoAAcodes(seq, ff, n-(n-ff)%3) for ff in [0, 1, 2] ]
 
+#There must be some more elegant and faster way to do this
+#Tip1: according to MCMF value to see wheter the network is liantong 
 def FindPath(cur, term, G):
     path = [cur]
+    marker = set()
     while True:
         cur = path[-1]
         if cur == term:
             return path
         for node, val in G[cur].items():
-            if val > 0:
+            if val > 0 and node not in path and (cur, node) not in marker:
+                marker.add( (cur, node) )
                 path.append( node )
                 break
         else:
@@ -106,6 +110,10 @@ def FindPath(cur, term, G):
                 break
 
 def BuiltPath(path, v_nodes, j_nodes, k=25):
+
+# Some code for these is no path
+    if path == None or len(path) < 2:
+        return (3, "", "", "")
 
     v = v_nodes[ path[0]  ][0]
     j = j_nodes[ path[-1] ][0]
@@ -188,14 +196,14 @@ def real_score(rd, ref_seq):
 def map2align(inp, ref, threads):
 
     #TODO(chensy) change to config.json
-    bwa = "bwa"
+    bwa = "/workspace/chensy/dual/0.Script/deer/bwa-mem2-2.2.1_x64-linux/bwa-mem2"
     samtools = "samtools"
 
     prefix = os.path.realpath(sys.argv[0]).replace("DeRR.py", "")
     sam_file = prefix + "temporary/"+ ''.join(random.choices(string.ascii_uppercase + string.digits, k=10)) + '.tmp'
     bam_file = prefix + "temporary/" + ''.join(random.choices(string.ascii_uppercase + string.digits, k=10)) + '.tmp'
-    #os.system(f"{bwa} mem  -t {threads} -k 10 -A 1 -B 2 -L 0 -T 17 -v 0 {ref} {inp} 2>/dev/null | {samtools} view -Sh -F 2308 - 2>/dev/null > {sam_file}")
-    os.system(f"{bwa} mem -t {threads} -k 11 -A 1 -B 2 -L 0 -T 17 -v 0 {ref} {inp} 2>/dev/null > {sam_file}")
+    #os.system(f"{bwa} mem -t {threads} -r 2.3 -k 10 -A 1 -B 2 -L 0 -T 17 -v 0 {ref} {inp} 2>/dev/null > {sam_file}")
+    os.system(f"{bwa} mem -t {threads} -r 2.3 -k 10 -A 1 -B 2 -L 0 -T 17 -v 0 {ref} {inp} 2>/dev/null > {sam_file}")
     os.system(f"{samtools} view -Sh -F 2308 {sam_file} 2>/dev/null > {bam_file}")
     os.system(f"rm -f {sam_file}")
     return bam_file
@@ -256,8 +264,8 @@ def align(inp, threads=1):
 
 
     res = (
-        map2align(output, f"{prefix}reference/AIRR-V-DNA.fa", threads),
-        map2align(output, f"{prefix}reference/AIRR-J-DNA.fa", threads)
+        map2align(output, f"{prefix}reference/MEM2/AIRR-V-DNA.fa", threads),
+        map2align(output, f"{prefix}reference/MEM2/AIRR-J-DNA.fa", threads)
     )
     os.system(f'rm -f {output}')
     return res
@@ -427,6 +435,7 @@ def catt(inp, chain, threads):
     jrs = list(filter(lambda x: x!= None, map(lambda x: assignJ(x, refName2Seq), jrs)))
 
 
+
     config = {
         'TRB':{
             "cmotif":"(LR|YF|YI|YL|YQ|YR)C(A|S|T|V|G|R|P|D)",
@@ -468,7 +477,8 @@ def catt(inp, chain, threads):
                 rd.cdr3 = res[0]
                 break
 
-    # remove reads that don't have any CDR3 motif
+
+
 
     ##### Build kmer table
     cnt = {}
@@ -488,6 +498,7 @@ def catt(inp, chain, threads):
         for i in range( 0, min(kmer_offset + k, l)):
             kmer = seq[i:(i+k)]
             cnt[kmer] = cnt.setdefault(kmer, 0) + 1
+
 
 ##### Remove reads that span over junction
     vdx, jdx = 0, 0
@@ -515,7 +526,6 @@ def catt(inp, chain, threads):
     #remove
     vrs = list(filter(lambda x: x.avlb and len(x.seq) >= 35, vrs))
     jrs = list(filter(lambda x: x.avlb and len(x.seq) >= 35, jrs))
-
 
 
     ####### Build the network, and run MFNC
@@ -611,6 +621,7 @@ def catt(inp, chain, threads):
                         reduce_list[cdr3] = reduce_list.setdefault(cdr3, 0 ) + 1
                     break
 
+
     if len(final_res) > 0:
 
         tab = pd.DataFrame(final_res)
@@ -625,7 +636,6 @@ def catt(inp, chain, threads):
         tab = tab[ tab.Counts > 2 ]
         tab['Chain'] = chain
 
-        #TODO(chensy) change some here
         return Correct(tab.sort_values('Counts', ascending=False))
     else:
         return pd.DataFrame(columns = ['Vgene', 'Jgene', 'CDR3', 'Counts', 'Chain'])
@@ -634,12 +644,17 @@ def CommandLineParser():
     parser = argparse.ArgumentParser()
     parser.add_argument("--inf",  required=True, help="Input file")
     parser.add_argument("--out",  required=True, help="Output folder")
+    parser.add_argument("--align", type=int, default=4)
     parser.add_argument("--threads", type=int, default=2)
     return parser.parse_args()
 
 def Protocol(inp):
 
-    r1, r2, sample_id, threads = inp
+    if len(inp) < 5:
+        r1, r2, sample_id, threads = inp
+        output = None
+    else:
+        r1, r2, sample_id, threads, output = inp
 
     new_inp = align((r1, r2),      threads)
     alpha   = catt(new_inp, 'TRA', threads)
@@ -649,6 +664,8 @@ def Protocol(inp):
     tmp['CellId'] = sample_id
 
     os.system(f"rm -f {new_inp[0]} {new_inp[1]}")
+    if output != None:
+        tmp.to_csv(f"{output}", index=False, sep='\t')
     return tmp
 
 
@@ -661,13 +678,23 @@ if __name__ == "__main__":
 
     selfLog("Loading Manifest file")
 
-    tab = pd.read_csv(f"{args['inf']}", sep='\t', index_col=0, header=None)
+    try:
+        tab = pd.read_csv(f"{args['inf']}", sep='\t', index_col=0, header=None)
+    except:
+        selfLog("WARNING: Manifest file is empty")
+        res = pd.DataFrame(columns = ['Vgene', 'Jgene', 'CDR3', 'Counts', 'Chain'])
+        res.to_csv(args['out'], index=False, sep='\t')
+        exit(0)
 
-    max_thread  = min( args['threads'], 4)
-    max_workers = max( args['threads'] // 4, 1 )
+
+    max_thread  = min( args['threads'], args['align'])
+    max_workers = max( args['threads'] // args['align'], 1 )
 
     selfLog("Start detecting TCR")
-    res = process_map(Protocol, [ (row[1], row[2], sample_id, max_thread) for sample_id, row in tab.iterrows() ], max_workers = max_workers, chunksize=2)
+    if tab.shape[1] < 3:
+        res = process_map(Protocol, [ (row[1], row[2], sample_id, max_thread) for sample_id, row in tab.iterrows() ], max_workers = max_workers, chunksize=2)
+    else:
+        res = process_map(Protocol, [ (row[1], row[2], sample_id, max_thread, row[3]) for sample_id, row in tab.iterrows() ], max_workers = max_workers, chunksize=2)
     selfLog("Detection end")
 
 
