@@ -91,7 +91,7 @@ def TranslateIntoAA(seq):
     return [ BreakSeqIntoAAcodes(seq, ff, n-(n-ff)%3) for ff in [0, 1, 2] ]
 
 #There must be some more elegant and faster way to do this
-#Tip1: according to MCMF value to see wheter the network is liantong 
+#Tip1: according to MCMF value to see wheter the network is liantong
 def FindPath(cur, term, G):
     path = [cur]
     marker = set()
@@ -202,7 +202,7 @@ def map2align(inp, ref, threads):
     prefix = os.path.realpath(sys.argv[0]).replace("DeRR.py", "")
     sam_file = prefix + "temporary/"+ ''.join(random.choices(string.ascii_uppercase + string.digits, k=10)) + '.tmp'
     bam_file = prefix + "temporary/" + ''.join(random.choices(string.ascii_uppercase + string.digits, k=10)) + '.tmp'
-    #os.system(f"{bwa} mem -t {threads} -r 2.3 -k 10 -A 1 -B 2 -L 0 -T 17 -v 0 {ref} {inp} 2>/dev/null > {sam_file}")
+    #os.system(f"{bwa} mem -t {threads} -r 2.3 -k 10 -A 1 -B 2 -L 0 -T 17 -v 0 {ref} {inp} > {sam_file}")
     os.system(f"{bwa} mem -t {threads} -r 2.3 -k 10 -A 1 -B 2 -L 0 -T 17 -v 0 {ref} {inp} 2>/dev/null > {sam_file}")
     os.system(f"{samtools} view -Sh -F 2308 {sam_file} 2>/dev/null > {bam_file}")
     os.system(f"rm -f {sam_file}")
@@ -248,19 +248,27 @@ def Correct(group):
 
     return group
 
-def align(inp, threads=1):
+def align(inp, threads, args):
 
     ##### QC
+    #TODO(chensy) change here to config.json
     fastp = 'fastp'
     r1, r2 = inp
 
     prefix = os.path.realpath(sys.argv[0]).replace("DeRR.py", "")
     os.system(f"mkdir -p {prefix}/temporary")
     output = prefix + "temporary/" + ''.join(random.choices(string.ascii_uppercase + string.digits, k=10)) + '.tmp'
-    if r2 != "None":
-        os.system(f"{fastp} -i {r1} -I {r2} -m --merged_out {output} --include_unmerged --detect_adapter_for_pe -q 20 -e 25 -L 30 -c -g -w {threads} -h /dev/null -j /dev/null --overlap_len_require 20 --overlap_diff_limit 2  >/dev/null 2>&1")
+
+    if args['QC']:
+        if r2 != "None":
+            os.system(f"{fastp} -i {r1} -I {r2} -m --merged_out {output} --include_unmerged --detect_adapter_for_pe -q 20 -e 25 -L 30 -c -g -w {threads} -h /dev/null -j /dev/null --overlap_len_require 20 --overlap_diff_limit 2  >/dev/null 2>&1")
+        else:
+            os.system(f"{fastp} -i {r1} -o {output} -q 20 -e 25 -L 30 -c -g -w {threads} -h /dev/null -j /dev/null  >/dev/null 2>&1")
     else:
-        os.system(f"{fastp} -i {r1} -o {output} -q 20 -e 25 -L 30 -c -g -w {threads} -h /dev/null -j /dev/null  >/dev/null 2>&1")
+        if r2 != "None":
+            os.system(f"cat {r1} {r2} > {output}")
+        else:
+            os.system(f"ln -s {os.path.realpath(r1)} {output}")
 
 
     res = (
@@ -642,21 +650,25 @@ def catt(inp, chain, threads):
 
 def CommandLineParser():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--inf",  required=True, help="Input file")
+    group = parser.add_mutually_exclusive_group(required=True)
+    group.add_argument("--inf", help="Input file")
+    group.add_argument("--r1", help="Read1 file")
+    parser.add_argument("--r2", help="Read2 file", default="None")
     parser.add_argument("--out",  required=True, help="Output folder")
     parser.add_argument("--align", type=int, default=4)
     parser.add_argument("--threads", type=int, default=2)
+    parser.add_argument("--QC", action='store_true')
     return parser.parse_args()
 
 def Protocol(inp):
 
-    if len(inp) < 5:
-        r1, r2, sample_id, threads = inp
+    if len(inp) < 6:
+        r1, r2, sample_id, threads, args = inp
         output = None
     else:
-        r1, r2, sample_id, threads, output = inp
+        r1, r2, sample_id, threads, args, output = inp
 
-    new_inp = align((r1, r2),      threads)
+    new_inp = align((r1, r2),      threads, args)
     alpha   = catt(new_inp, 'TRA', threads)
     beta    = catt(new_inp, 'TRB', threads)
 
@@ -676,28 +688,34 @@ if __name__ == "__main__":
     args = CommandLineParser()
     args = { arg:getattr(args, arg) for arg in vars(args) }
 
-    selfLog("Loading Manifest file")
-
-    try:
-        tab = pd.read_csv(f"{args['inf']}", sep='\t', index_col=0, header=None)
-    except:
-        selfLog("WARNING: Manifest file is empty")
-        res = pd.DataFrame(columns = ['Vgene', 'Jgene', 'CDR3', 'Counts', 'Chain'])
-        res.to_csv(args['out'], index=False, sep='\t')
-        exit(0)
-
-
     max_thread  = min( args['threads'], args['align'])
     max_workers = max( args['threads'] // args['align'], 1 )
 
-    selfLog("Start detecting TCR")
-    if tab.shape[1] < 3:
-        res = process_map(Protocol, [ (row[1], row[2], sample_id, max_thread) for sample_id, row in tab.iterrows() ], max_workers = max_workers, chunksize=2)
+    if args["r1"] != None:
+        selfLog("Start detecting TCR")
+        res = Protocol((args["r1"], args["r2"], "None", max_thread, args))
+        res.to_csv(args["out"], index=False, sep='\t')
+        selfLog("Detection end")
+
     else:
-        res = process_map(Protocol, [ (row[1], row[2], sample_id, max_thread, row[3]) for sample_id, row in tab.iterrows() ], max_workers = max_workers, chunksize=2)
-    selfLog("Detection end")
 
+        selfLog("Loading Manifest file")
 
-    pd.concat(res).to_csv(args['out'], index=False, sep='\t')
+        try:
+            tab = pd.read_csv(f"{args['inf']}", sep='\t', index_col=0, header=None)
+        except:
+            selfLog("WARNING: Manifest file is empty")
+            res = pd.DataFrame(columns = ['Vgene', 'Jgene', 'CDR3', 'Counts', 'Chain'])
+            res.to_csv(args['out'], index=False, sep='\t')
+            exit(0)
+
+        selfLog("Start detecting TCR")
+        if tab.shape[1] < 3:
+            res = process_map(Protocol, [ (row[1], row[2], sample_id, max_thread, args) for sample_id, row in tab.iterrows() ], max_workers = max_workers, chunksize=2)
+        else:
+            res = process_map(Protocol, [ (row[1], row[2], sample_id, max_thread, args, row[3]) for sample_id, row in tab.iterrows() ], max_workers = max_workers, chunksize=2)
+        selfLog("Detection end")
+        pd.concat(res).to_csv(args['out'], index=False, sep='\t')
+
     selfLog("Program end")
 
