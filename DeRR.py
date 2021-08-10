@@ -445,14 +445,14 @@ def catt(inp, chain, threads):
     jrs = [ x[0] for x in TongMing(jrs) ]
     #remove reads taht have no contribution to the result
     jrs = list(filter(lambda x: x!= None, map(lambda x: assignJ(x, refName2Seq), jrs)))
-    
+
 #     print("Vrs\n")
 #     for x in vrs:
 #         print(x.seq)
 #     print("Jrs\n")
 #     for x in jrs:
 #         print(x.seq)
-    
+
     config = {
         'TRB':{
             "cmotif":"(LR|YF|YI|YL|YQ|YR)C(A|S|T|V|G|R|P|D)",
@@ -666,7 +666,7 @@ def CommandLineParser():
     parser.add_argument("--out", help="Output folder", default="None")
     parser.add_argument("--align", type=int, default=4)
     parser.add_argument("--threads", type=int, default=2)
-    parser.add_argument("--QC", action='store_false')
+    parser.add_argument("--QC", action='store_true')
     return parser.parse_args()
 
 def Protocol(inp):
