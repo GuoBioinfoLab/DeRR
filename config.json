@@ -1,0 +1,7 @@
+{
+    "bwa": "/workspace/chensy/dual/0.Script/deer/bwa-mem2-2.2.1_x64-linux/bwa-mem2",
+    "TRV": "/workspace/chensy/dual/0.Script/deer/reference/MEM2/AIRR-V-DNA.fa",
+    "TRJ": "/workspace/chensy/dual/0.Script/deer/reference/MEM2/AIRR-J-DNA.fa",
+    "samtools": "samtools",
+    "fastp": "fastp"
+}

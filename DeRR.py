@@ -12,9 +12,13 @@ import string
 import random
 import editdistance
 import sys
+import json
 
 def selfLog(msg):
     print(time.ctime(time.time()) + "]     %s" % msg)
+
+with open(os.path.realpath(sys.argv[0]).replace("DeRR.py", "config.json"), "r") as handle:
+        global_config = json.load(handle)
 
 AAcode = {'TTT': 'F',
  'TTC': 'F',
@@ -195,15 +199,14 @@ def real_score(rd, ref_seq):
 
 def map2align(inp, ref, threads):
 
-    #TODO(chensy) change to config.json
-    bwa = "/workspace/chensy/dual/0.Script/deer/bwa-mem2-2.2.1_x64-linux/bwa-mem2"
-    samtools = "samtools"
+    bwa = global_config["bwa"]
+    samtools = global_config["samtools"]
 
     prefix = os.path.realpath(sys.argv[0]).replace("DeRR.py", "")
     sam_file = prefix + "temporary/"+ ''.join(random.choices(string.ascii_uppercase + string.digits, k=10)) + '.tmp'
     bam_file = prefix + "temporary/" + ''.join(random.choices(string.ascii_uppercase + string.digits, k=10)) + '.tmp'
     #os.system(f"{bwa} mem -t {threads} -r 2.3 -k 10 -A 1 -B 2 -L 0 -T 17 -v 0 {ref} {inp} > {sam_file}")
-    os.system(f"{bwa} mem -t {threads} -r 2.3 -k 10 -A 1 -B 2 -L 0 -T 17 -v 0 {ref} {inp} 2>/dev/null > {sam_file}")
+    os.system(f"{bwa} mem -t {threads} -k 10 -A 1 -B 2 -L 0 -T 10 -v 0 {ref} {inp} 2>/dev/null > {sam_file}")
     os.system(f"{samtools} view -Sh -F 2308 {sam_file} 2>/dev/null > {bam_file}")
     os.system(f"rm -f {sam_file}")
     return bam_file
@@ -251,8 +254,7 @@ def Correct(group):
 def align(inp, threads, args):
 
     ##### QC
-    #TODO(chensy) change here to config.json
-    fastp = 'fastp'
+    fastp = global_config["fastp"]
     r1, r2 = inp
 
     prefix = os.path.realpath(sys.argv[0]).replace("DeRR.py", "")
@@ -270,11 +272,15 @@ def align(inp, threads, args):
         else:
             os.system(f"ln -s {os.path.realpath(r1)} {output}")
 
-
     res = (
-        map2align(output, f"{prefix}reference/MEM2/AIRR-V-DNA.fa", threads),
-        map2align(output, f"{prefix}reference/MEM2/AIRR-J-DNA.fa", threads)
+        map2align(output, global_config["TRV"], threads),
+        map2align(output, global_config["TRJ"], threads)
     )
+
+    #res = (
+    #    map2align(output, f"{prefix}reference/MEM2/AIRR-V-DNA.fa", threads),
+    #    map2align(output, f"{prefix}reference/MEM2/AIRR-J-DNA.fa", threads)
+    #)
     os.system(f'rm -f {output}')
     return res
 
@@ -366,8 +372,6 @@ def TongMing(ll, rev=1):
     else:
         yield res
 
-#TODO(chensy) 2 round to found potential reads
-#try to avoid error from sequences that have only innerC
 def Extract_Motif(seq, cmotif, fmotif, coffset, foffset, innerC, innerF):
 
     res = 0
@@ -377,33 +381,11 @@ def Extract_Motif(seq, cmotif, fmotif, coffset, foffset, innerC, innerF):
     if len(Cx) ==0 and len(Fx) == 0:
         return ("None", 0)
 
-    # if (len(Cx) < 0 ) ^ (len(Fx) < 0):
-    #     if len(Cx) < 0:
-    #         Cx = [ m.end() -2 for m in re.finditer(innerC, seq) ]
-    #     else:
-    #         Fx = [ m for m in re.finditer(innerF, seq)]
-
-    for (idx, xc) in enumerate(Cx):
-        for xf in Fx:
-            if (22 >=xf -xc >= 6 ) and ( idx == len(Cx) -1  or not (32>=xf-Cx[idx+1]>=7)) and not "*" in seq[xc:xf]:
-                return (seq[xc:xf-2], 2)
-
-    return ("None", 1)
-
-def Extract_CDR3(seq, cmotif, fmotif, coffset, foffset, innerC, innerF):
-
-    res = 0
-    Cx = [ m.end() - coffset for m in re.finditer(cmotif, seq) ]
-    Fx = [ m.end() - foffset for m in re.finditer(fmotif, seq) ]
-
-    if len(Cx) ==0 and len(Fx) == 0:
-        return ("None", 0)
-
-    if (len(Cx) < 0 ) ^ (len(Fx) < 0):
-        if len(Cx) < 0:
-            Cx = [ m.end() -2 for m in re.finditer(innerC, seq) ]
+    if (len(Cx) < 1 ) ^ (len(Fx) < 1):
+        if len(Cx) < 1:
+            Cx = [ m.end() -3 for m in re.finditer(innerC, seq) ]
         else:
-            Fx = [ m for m in re.finditer(innerF, seq)]
+            Fx = [ m.end() +2 for m in re.finditer(innerF, seq)]
 
     for (idx, xc) in enumerate(Cx):
         for xf in Fx:
@@ -411,6 +393,28 @@ def Extract_CDR3(seq, cmotif, fmotif, coffset, foffset, innerC, innerF):
                 return (seq[xc:xf-2], 2)
 
     return ("None", 1)
+
+# def Extract_CDR3(seq, cmotif, fmotif, coffset, foffset, innerC, innerF):
+
+#     res = 0
+#     Cx = [ m.end() - coffset for m in re.finditer(cmotif, seq) ]
+#     Fx = [ m.end() - foffset for m in re.finditer(fmotif, seq) ]
+
+#     if len(Cx) ==0 and len(Fx) == 0:
+#         return ("None", 0)
+
+#     if (len(Cx) < 0 ) ^ (len(Fx) < 0):
+#         if len(Cx) < 0:
+#             Cx = [ m.end() -3 for m in re.finditer(innerC, seq) ]
+#         else:
+#             Fx = [ m for m in re.finditer(innerF, seq)]
+
+#     for (idx, xc) in enumerate(Cx):
+#         for xf in Fx:
+#             if (22 >=xf -xc >= 6 ) and ( idx == len(Cx) -1  or not (32>=xf-Cx[idx+1]>=7)) and not "*" in seq[xc:xf]:
+#                 return (seq[xc:xf-2], 2)
+
+#     return ("None", 1)
 
 
 def catt(inp, chain, threads):
@@ -418,11 +422,11 @@ def catt(inp, chain, threads):
     vbam, jbam = inp
 
     refName2Seq = {}
+
     prefix = os.path.realpath(sys.argv[0]).replace("DeRR.py", "")
-    for name in [ f"{prefix}reference/AIRR-V-DNA.fa", f"{prefix}reference/AIRR-J-DNA.fa"]:
+    for name in [ global_config["TRV"], global_config["TRJ"] ]:
         for seq in SeqIO.parse(name, 'fasta'):
             refName2Seq[ seq.id ] = str(seq.seq).upper()
-
 
     try:
         vrs = [ rd for rd in pysam.AlignmentFile(vbam, 'r') if chain in rd.reference_name ]
@@ -441,25 +445,30 @@ def catt(inp, chain, threads):
     jrs = [ x[0] for x in TongMing(jrs) ]
     #remove reads taht have no contribution to the result
     jrs = list(filter(lambda x: x!= None, map(lambda x: assignJ(x, refName2Seq), jrs)))
-
-
-
+    
+#     print("Vrs\n")
+#     for x in vrs:
+#         print(x.seq)
+#     print("Jrs\n")
+#     for x in jrs:
+#         print(x.seq)
+    
     config = {
         'TRB':{
             "cmotif":"(LR|YF|YI|YL|YQ|YR)C(A|S|T|V|G|R|P|D)",
             "fmotif": "(F|T|Y|H)FG(A|D|E|N|P|Q|S)G",
             "coffset":2,
             "foffset":1,
-            "innerC":"place_holder",
-            "innerF":"place_holder",
+            "innerC":"(CAS|CSA|CAW|CAT|CSV|CAI|CAR|CAV|CSG|CAN)",
+            "innerF":"(QYF|YTF|AFF|QFF|LFF|QHF|LHF|LTF|IYF|KLF)",
         },
         'TRA': {
             "cmotif": "[EHILMSTV]{1}Y[FILY]{1}C[AGILV]{1}",
             "fmotif": "(LA|YI|FI|II|LY|LM|PT|TI|LV|ST|VT|LT|LI|LQ|MR|VI|FV|FQ|LF|LL|FE|FT|LS|LN|FY)F((ARG)|(G[A-Z]{1}G))",
             "coffset": 2,
             "foffset": 1,
-            "innerC": "place_holder",
-            "innerF": "place_holder"
+            "innerC": "(CAF|CVF|CIF|CLF|CGF|CSF|CPF|CHF|CDF|CMF)",
+            "innerF": "(LTF|LIF|LVF|FYF|LSF|YIF|LMF|FVF|IIF|TIF)"
         }
 
     }
@@ -575,6 +584,7 @@ def catt(inp, chain, threads):
             G.add_edge(x, y, capacity = 102410241024, weight = -cnt[y])
 
 
+    #TODO(chensy) fast judge if there are path
     flow_dict = nx.max_flow_min_cost(G, 'Source', 'Terminal')
     rG = G.reverse()
     for node, _ in j_nodes.items():
@@ -586,7 +596,6 @@ def catt(inp, chain, threads):
     left_v = [ x for (x, val) in flow_dict['Source'].items() if val > 0 ]
     left_j = [ x for (x, val) in flow_dict_r['Terminal'].items() if val > 0 ]
 
-    #TODO(chensy) Different of Extract_Motif and Extract_CDR3
     for rd in vrs:
         if rd.name + '_V' not in left_v and rd.cdr3 != 'None':
             final_res.append((rd.vgene, rd.cdr3, 'None'))
@@ -641,7 +650,7 @@ def catt(inp, chain, threads):
         tab = pd.DataFrame([ (most_common(group['Vgene'], group['counts']), most_common(group['Jgene'], group['counts']), cdr3, sum(group['counts']), 'TRB') for cdr3, group in tab.groupby('CDR3') ], columns = ['Vgene', 'Jgene', 'CDR3', 'Counts', 'Chain'])
         for seq, val in reduce_list.items():
             tab.loc[ tab.CDR3 == seq, 'Counts' ] = tab.loc[ tab.CDR3 == seq, 'Counts' ] - val
-        tab = tab[ tab.Counts > 2 ]
+        #tab = tab[ tab.Counts > 2 ]
         tab['Chain'] = chain
 
         return Correct(tab.sort_values('Counts', ascending=False))
@@ -654,10 +663,10 @@ def CommandLineParser():
     group.add_argument("--inf", help="Input file")
     group.add_argument("--r1", help="Read1 file")
     parser.add_argument("--r2", help="Read2 file", default="None")
-    parser.add_argument("--out",  required=True, help="Output folder")
+    parser.add_argument("--out", help="Output folder", default="None")
     parser.add_argument("--align", type=int, default=4)
     parser.add_argument("--threads", type=int, default=2)
-    parser.add_argument("--QC", action='store_true')
+    parser.add_argument("--QC", action='store_false')
     return parser.parse_args()
 
 def Protocol(inp):
@@ -694,7 +703,8 @@ if __name__ == "__main__":
     if args["r1"] != None:
         selfLog("Start detecting TCR")
         res = Protocol((args["r1"], args["r2"], "None", max_thread, args))
-        res.to_csv(args["out"], index=False, sep='\t')
+        if args["out"] != "None":
+            res.to_csv(args["out"], index=False, sep='\t')
         selfLog("Detection end")
 
     else:
@@ -715,7 +725,9 @@ if __name__ == "__main__":
         else:
             res = process_map(Protocol, [ (row[1], row[2], sample_id, max_thread, args, row[3]) for sample_id, row in tab.iterrows() ], max_workers = max_workers, chunksize=2)
         selfLog("Detection end")
-        pd.concat(res).to_csv(args['out'], index=False, sep='\t')
+
+        if args["out"] != "None":
+            pd.concat(res).to_csv(args['out'], index=False, sep='\t')
 
     selfLog("Program end")
 
