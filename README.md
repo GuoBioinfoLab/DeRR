@@ -1,6 +1,6 @@
 # DeRR
 
-<img src='./DEERR_logo.png' align='right' height=350>
+<img src='DEERR_logo.png' align='right' height=350>
 
 ### What is **DERR**
 

@@ -248,7 +248,14 @@ def Correct(group):
             group.iloc[idx, 0] = most_common(remove['Jgene'], remove['Counts'])
 
         group.drop(remove.index[1:], inplace=True)
-
+        
+    try:
+        max_count = list(group['Counts'])[0]
+        group = group[ (group.Vgene != 'None') & (group.Jgene != 'None') ]
+        group = group[  group.Counts > max( max_count / 100, 2 )  ]
+    except:
+        pass
+    
     return group
 
 def align(inp, threads, args):
@@ -389,7 +396,7 @@ def Extract_Motif(seq, cmotif, fmotif, coffset, foffset, innerC, innerF):
 
     for (idx, xc) in enumerate(Cx):
         for xf in Fx:
-            if (22 >=xf -xc >= 6 ) and ( idx == len(Cx) -1  or not (32>=xf-Cx[idx+1]>=7)) and not "*" in seq[xc:xf]:
+            if (26 >=xf-xc-2 >= 7 ) and ( idx == len(Cx) -1  or not (26>=xf-Cx[idx+1]>=7)) and not "*" in seq[xc:xf]:
                 return (seq[xc:xf-2], 2)
 
     return ("None", 1)
@@ -445,7 +452,17 @@ def catt(inp, chain, threads):
     jrs = [ x[0] for x in TongMing(jrs) ]
     #remove reads taht have no contribution to the result
     jrs = list(filter(lambda x: x!= None, map(lambda x: assignJ(x, refName2Seq), jrs)))
+    
+    if chain == 'TRB':
 
+        with open("VrsXX.txt", 'w') as handle:
+            for x in vrs:
+                handle.write(x.vgene + '   '  + x.seq + '\n')
+
+        with open("JrsXX.txt", 'w') as handle:
+            for x in jrs:
+                handle.write(x.jgene + '   '  + x.seq + '\n') 
+    
 #     print("Vrs\n")
 #     for x in vrs:
 #         print(x.seq)
@@ -467,8 +484,8 @@ def catt(inp, chain, threads):
             "fmotif": "(LA|YI|FI|II|LY|LM|PT|TI|LV|ST|VT|LT|LI|LQ|MR|VI|FV|FQ|LF|LL|FE|FT|LS|LN|FY)F((ARG)|(G[A-Z]{1}G))",
             "coffset": 2,
             "foffset": 1,
-            "innerC": "(CAF|CVF|CIF|CLF|CGF|CSF|CPF|CHF|CDF|CMF)",
-            "innerF": "(LTF|LIF|LVF|FYF|LSF|YIF|LMF|FVF|IIF|TIF)"
+            "innerC": "(CAF|CVF|CIF|CLF|CGF|CSF|CPF|CHF|CDF|CMF|CAV|CAA|CAY|CAE)",
+            "innerF": "(LTF|LIF|LVF|FYF|LSF|YIF|LMF|FVF|IIF|TIF|AFF)"
         }
 
     }
