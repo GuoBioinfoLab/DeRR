@@ -190,8 +190,9 @@ def real_score(rd, ref_seq):
     score = 0
     for index in range(len(rd.seq)):
         offset = index - start
-        if 0 <= r_pos + offset < len(ref_seq) - 9 :
-            if rd.seq[index] == ref_seq[r_pos + offset]:
+        rel_pos = r_pos + offset
+        if 0 <= rel_pos < len(ref_seq) - 9 :
+            if rd.seq[index] == ref_seq[rel_pos]:
                 score = score + 1
             else:
                 score = score - 2
@@ -206,9 +207,9 @@ def map2align(inp, ref, threads):
     sam_file = prefix + "temporary/"+ ''.join(random.choices(string.ascii_uppercase + string.digits, k=10)) + '.tmp'
     bam_file = prefix + "temporary/" + ''.join(random.choices(string.ascii_uppercase + string.digits, k=10)) + '.tmp'
     #os.system(f"{bwa} mem -t {threads} -r 2.3 -k 10 -A 1 -B 2 -L 0 -T 17 -v 0 {ref} {inp} > {sam_file}")
-    os.system(f"{bwa} mem -t {threads} -k 10 -A 1 -B 2 -L 0 -T 10 -v 0 {ref} {inp} 2>/dev/null > {sam_file}")
+    os.system(f"{bwa} mem -t {threads} -SP -k 10 -A 1 -B 2 -L 0 -T 10 -v 0 {ref} {inp} 2>/dev/null > {sam_file}")
     os.system(f"{samtools} view -Sh -F 2308 {sam_file} 2>/dev/null > {bam_file}")
-    os.system(f"rm -f {sam_file}")
+    os.system(f"rm -f {sam_file} &")
     return bam_file
 
 def most_common(vals, cnts):
@@ -440,7 +441,7 @@ def catt(inp, chain, threads):
     except:
          vrs = []
     vrs.sort(key = lambda x: x.qname)
-    vrs = [ x[0] for x in TongMing(vrs, -1) ]
+    #vrs = [ x[0] for x in TongMing(vrs, -1) ]
     vrs = list(filter(lambda x: x!= None, map(lambda x: assignV(x, refName2Seq), vrs)))
 
 
@@ -449,19 +450,19 @@ def catt(inp, chain, threads):
     except:
         jrs = []
     jrs.sort(key = lambda x: x.qname)
-    jrs = [ x[0] for x in TongMing(jrs) ]
+    #jrs = [ x[0] for x in TongMing(jrs) ]
     #remove reads taht have no contribution to the result
     jrs = list(filter(lambda x: x!= None, map(lambda x: assignJ(x, refName2Seq), jrs)))
     
-    if chain == 'TRB':
+    # if chain == 'TRB':
 
-        with open("VrsXX.txt", 'w') as handle:
-            for x in vrs:
-                handle.write(x.vgene + '   '  + x.seq + '\n')
+    #     with open("VrsXX.txt", 'w') as handle:
+    #         for x in vrs:
+    #             handle.write(x.vgene + '   '  + x.seq + '\n')
 
-        with open("JrsXX.txt", 'w') as handle:
-            for x in jrs:
-                handle.write(x.jgene + '   '  + x.seq + '\n') 
+    #     with open("JrsXX.txt", 'w') as handle:
+    #         for x in jrs:
+    #             handle.write(x.jgene + '   '  + x.seq + '\n') 
     
 #     print("Vrs\n")
 #     for x in vrs:
