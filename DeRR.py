@@ -302,7 +302,6 @@ def assignV(rd, refName2Seq):
     r_pos = rd.reference_start
     r_lgt = len(ref_seq)
 
-
     if (r_lgt - r_pos) - (len(tseq) - start  ) > -10:
         #discard
         return None
@@ -327,12 +326,13 @@ def assignJ(rd, refName2Seq):
     refname = rd.reference_name
     tseq = rd.seq
     ref_seq = refName2Seq[ refname ]
-    r_pos = rd.reference_start
-    r_lgt = len(ref_seq)
+    # r_pos = rd.reference_start
+    # r_lgt = len(ref_seq)
 
     if start - 1 < 10:
         return None
     elif real_score(rd, ref_seq) < 0:
+        #eal_score(rd, ref_seq) < term - start - 2:
         return None
     elif 'N' in tseq:
         return None
@@ -501,6 +501,7 @@ def catt(inp, chain, threads):
             if res[1] > 0:
                 rd.avlb = True
             if res[1] == 2:
+                rd.avlb = True
                 rd.cdr3 = res[0]
 
     for rd in jrs:
@@ -509,6 +510,7 @@ def catt(inp, chain, threads):
             if res[1] > 0:
                 rd.avlb = True
             if res[1] == 2:
+                rd.avlb = True
                 rd.cdr3 = res[0]
                 break
 
@@ -683,7 +685,7 @@ def CommandLineParser():
     parser.add_argument("--r2", help="Read2 file", default="None")
     parser.add_argument("--out", help="Output folder", default="None")
     parser.add_argument("--align", type=int, default=4)
-    parser.add_argument("--threads", type=int, default=2)
+    parser.add_argument("--threads", type=int, default=4)
     parser.add_argument("--QC", action='store_true')
     return parser.parse_args()
 
@@ -696,6 +698,7 @@ def Protocol(inp):
         r1, r2, sample_id, threads, args, output = inp
 
     new_inp = align((r1, r2),      threads, args)
+    
     alpha   = catt(new_inp, 'TRA', threads)
     beta    = catt(new_inp, 'TRB', threads)
 
