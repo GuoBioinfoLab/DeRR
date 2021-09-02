@@ -471,6 +471,7 @@ def catt(inp, chain, threads):
 #     for x in jrs:
 #         print(x.seq)
 
+
     config = {
         'TRB':{
             "cmotif":"(LR|YF|YI|YL|YQ|YR)C(A|S|T|V|G|R|P|D)",
@@ -513,8 +514,6 @@ def catt(inp, chain, threads):
                 rd.avlb = True
                 rd.cdr3 = res[0]
                 break
-
-
 
 
     ##### Build kmer table
@@ -563,7 +562,6 @@ def catt(inp, chain, threads):
     #remove
     vrs = list(filter(lambda x: x.avlb and len(x.seq) >= 35, vrs))
     jrs = list(filter(lambda x: x.avlb and len(x.seq) >= 35, jrs))
-
 
     ####### Build the network, and run MFNC
     G = nx.DiGraph()
@@ -658,7 +656,6 @@ def catt(inp, chain, threads):
                         reduce_list[cdr3] = reduce_list.setdefault(cdr3, 0 ) + 1
                     break
 
-
     if len(final_res) > 0:
 
         tab = pd.DataFrame(final_res)
@@ -698,7 +695,7 @@ def Protocol(inp):
         r1, r2, sample_id, threads, args, output = inp
 
     new_inp = align((r1, r2),      threads, args)
-    
+
     alpha   = catt(new_inp, 'TRA', threads)
     beta    = catt(new_inp, 'TRB', threads)
 
