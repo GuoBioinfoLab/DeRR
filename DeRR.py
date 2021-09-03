@@ -444,7 +444,7 @@ def catt(inp, chain, threads):
         if res != None:
             vrs.append(vrs)
 
-    vrs.sort(key = lambda x: x.qname)
+    vrs.sort(key = lambda x: x[0])
 
 
     jrs = []
@@ -454,7 +454,7 @@ def catt(inp, chain, threads):
         res = assignJ(rd, refName2Seq)
         if res != None:
             jrs.append(res)
-    jrs.sort(key = lambda x: x.qname)
+    jrs.sort(key = lambda x: x[0])
     
     # if chain == 'TRB':
 
