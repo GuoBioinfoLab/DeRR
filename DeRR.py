@@ -431,28 +431,30 @@ def catt(inp, chain, threads):
 
     refName2Seq = {}
 
-    prefix = os.path.realpath(sys.argv[0]).replace("DeRR.py", "")
+    #prefix = os.path.realpath(sys.argv[0]).replace("DeRR.py", "")
     for name in [ global_config["TRV"], global_config["TRJ"] ]:
         for seq in SeqIO.parse(name, 'fasta'):
             refName2Seq[ seq.id ] = str(seq.seq).upper()
 
-    try:
-        vrs = [ rd for rd in pysam.AlignmentFile(vbam, 'r') if chain in rd.reference_name ]
-    except:
-         vrs = []
+    vrs = []
+    for rd in pysam.AlignmentFile(vbam, 'r'):
+        if chain not in rd.reference_name:
+            continue
+        res = assignV(rd, refName2Seq)
+        if res != None:
+            vrs.append(vrs)
+
     vrs.sort(key = lambda x: x.qname)
-    #vrs = [ x[0] for x in TongMing(vrs, -1) ]
-    vrs = list(filter(lambda x: x!= None, map(lambda x: assignV(x, refName2Seq), vrs)))
 
 
-    try:
-        jrs = [ rd for rd in pysam.AlignmentFile(jbam, 'r') if chain in rd.reference_name ]
-    except:
-        jrs = []
+    jrs = []
+    for rd in pysam.AlignmentFile(jbam, 'r'):
+        if chain not in rd.reference_name:
+            continue
+        res = assignJ(rd, refName2Seq)
+        if res != None:
+            jrs.append(res)
     jrs.sort(key = lambda x: x.qname)
-    #jrs = [ x[0] for x in TongMing(jrs) ]
-    #remove reads taht have no contribution to the result
-    jrs = list(filter(lambda x: x!= None, map(lambda x: assignJ(x, refName2Seq), jrs)))
     
     # if chain == 'TRB':
 
