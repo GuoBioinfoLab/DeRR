@@ -184,19 +184,18 @@ def SegmentFromCigar( cigartuples  ):
             end = pos
     return start,end
 
+def hamming_distance(chaine1, chaine2):
+    return sum(c1 != c2 for c1, c2 in zip(chaine1, chaine2))
+
 def real_score(rd, ref_seq):
     start, _ = SegmentFromCigar(rd.cigartuples)
     r_pos = rd.reference_start
-    score = 0
-    for index in range(len(rd.seq)):
-        offset = index - start
-        rel_pos = r_pos + offset
-        if 0 <= rel_pos < len(ref_seq) - 9 :
-            if rd.seq[index] == ref_seq[rel_pos]:
-                score = score + 1
-            else:
-                score = score - 2
-    return score
+
+    left =  max(0, start-r_pos)
+    right = min(len(rd.seq), len(ref_seq)-9+start-r_pos)
+
+    lgt = right - left
+    return lgt - hamming_distance(rd.seq[left:right], ref_seq[(r_pos - start):(r_pos - start + lgt)]) * 3
 
 def map2align(inp, ref, threads):
 
@@ -292,10 +291,9 @@ def align(inp, threads, args):
     os.system(f'rm -f {output}')
     return res
 
-
 def assignV(rd, refName2Seq):
 
-    start, term = SegmentFromCigar(rd.cigartuples)
+    start, _ = SegmentFromCigar(rd.cigartuples)
     refname = rd.reference_name
     tseq = rd.seq
     ref_seq = refName2Seq[ refname ]
@@ -322,7 +320,7 @@ def assignV(rd, refName2Seq):
 
 def assignJ(rd, refName2Seq):
 
-    start, term = SegmentFromCigar(rd.cigartuples)
+    start, _ = SegmentFromCigar(rd.cigartuples)
     refname = rd.reference_name
     tseq = rd.seq
     ref_seq = refName2Seq[ refname ]
