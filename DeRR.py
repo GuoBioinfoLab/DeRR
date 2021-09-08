@@ -148,10 +148,9 @@ def BuiltPath(path, v_nodes, j_nodes, k=25):
 
 class Myread(object):
 
-    def __init__(self, name, seq, qual, vgene, jgene, cdr3, avlb):
+    def __init__(self, name, seq, vgene, jgene, cdr3, avlb):
         self.seq = seq
         self.name = name
-        self.qual = qual
         self.vgene = vgene
         self.jgene = jgene
         self.cdr3 = cdr3
@@ -161,7 +160,6 @@ class Myread(object):
         return {
             'Seq': self.seq,
             'Name': self.name,
-            'Qual': self.qual,
             'Gene': " ".join([ self.vgene, self.jgene ]),
             'CDR3': self.cdr3,
             'Aviable': self.avlb
@@ -248,14 +246,14 @@ def Correct(group):
             group.iloc[idx, 0] = most_common(remove['Jgene'], remove['Counts'])
 
         group.drop(remove.index[1:], inplace=True)
-        
+
     try:
         max_count = list(group['Counts'])[0]
         group = group[ (group.Vgene != 'None') & (group.Jgene != 'None') ]
         group = group[  group.Counts > max( max_count / 100, 2 )  ]
     except:
         pass
-    
+
     return group
 
 def align(inp, threads, args):
@@ -311,7 +309,6 @@ def assignV(rd, refName2Seq):
         return Myread(
             rd.qname,
             tseq[start:],
-            rd.qual[start:],
             refname,
             "None",
             "None",
@@ -348,7 +345,6 @@ def assignJ(rd, refName2Seq):
          return Myread(
                 rd.qname,
                 tseq,
-                rd.qual,
                 "None",
                 refname,
                 "None",
@@ -453,7 +449,7 @@ def catt(inp, chain, threads):
         if res != None:
             jrs.append(res)
     jrs.sort(key = lambda x: x.name)
-    
+
     # if chain == 'TRB':
 
     #     with open("VrsXX.txt", 'w') as handle:
@@ -462,8 +458,8 @@ def catt(inp, chain, threads):
 
     #     with open("JrsXX.txt", 'w') as handle:
     #         for x in jrs:
-    #             handle.write(x.jgene + '   '  + x.seq + '\n') 
-    
+    #             handle.write(x.jgene + '   '  + x.seq + '\n')
+
 #     print("Vrs\n")
 #     for x in vrs:
 #         print(x.seq)
@@ -739,9 +735,9 @@ if __name__ == "__main__":
 
         selfLog("Start detecting TCR")
         if tab.shape[1] < 3:
-            res = process_map(Protocol, [ (row[1], row[2], sample_id, max_thread, args) for sample_id, row in tab.iterrows() ], max_workers = max_workers, chunksize=2)
+            res = process_map(Protocol, [ (row[1], row[2], sample_id, max_thread, args) for sample_id, row in tab.iterrows() ], max_workers = max_workers, chunksize=4)
         else:
-            res = process_map(Protocol, [ (row[1], row[2], sample_id, max_thread, args, row[3]) for sample_id, row in tab.iterrows() ], max_workers = max_workers, chunksize=2)
+            res = process_map(Protocol, [ (row[1], row[2], sample_id, max_thread, args, row[3]) for sample_id, row in tab.iterrows() ], max_workers = max_workers, chunksize=4)
         selfLog("Detection end")
 
         if args["out"] != "None":
