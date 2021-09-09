@@ -266,16 +266,20 @@ def align(inp, threads, args):
     os.system(f"mkdir -p {prefix}/temporary")
     output = prefix + "temporary/" + ''.join(random.choices(string.ascii_uppercase + string.digits, k=10)) + '.tmp'
 
-    if args['QC']:
-        if r2 != "None":
-            os.system(f"{fastp} -i {r1} -I {r2} -m --merged_out {output} --include_unmerged --detect_adapter_for_pe -q 20 -e 25 -L 30 -c -g -w {threads} -h /dev/null -j /dev/null --overlap_len_require 20 --overlap_diff_limit 2  >/dev/null 2>&1")
-        else:
-            os.system(f"{fastp} -i {r1} -o {output} -q 20 -e 25 -L 30 -c -g -w {threads} -h /dev/null -j /dev/null  >/dev/null 2>&1")
+    # if args['QC']:
+    #     if r2 != "None":
+    #         os.system(f"{fastp} -i {r1} -I {r2} -m --merged_out {output} --include_unmerged --detect_adapter_for_pe -q 20 -e 25 -L 30 -c -g -w {threads} -h /dev/null -j /dev/null --overlap_len_require 20 --overlap_diff_limit 2  >/dev/null 2>&1")
+    #     else:
+    #         os.system(f"{fastp} -i {r1} -o {output} -q 20 -e 25 -L 30 -c -g -w {threads} -h /dev/null -j /dev/null  >/dev/null 2>&1")
+    # else:
+    if r2 != "None":
+        command = 'cat'
+        if r1.split('.')[-1] == 'gz':
+            command = 'zcat'
+        os.system(f"cat {r1}" + " | awk '{if(NR%4==1) $0=sprintf(\"@1_%d\",(1+i++)); print;}'" + f" > {output}")
+        os.system(f"cat {r2}" + " | awk '{if(NR%4==1) $0=sprintf(\"@2_%d\",(1+i++)); print;}'" + f" >> {output}")
     else:
-        if r2 != "None":
-            os.system(f"cat {r1} {r2} > {output}")
-        else:
-            os.system(f"ln -s {os.path.realpath(r1)} {output}")
+        os.system(f"ln -s {os.path.realpath(r1)} {output}")
 
     res = (
         map2align(output, global_config["TRV"], threads),
@@ -556,8 +560,8 @@ def catt(inp, chain, threads):
             while(jdx < len(jrs) and vrs[vdx].name > jrs[jdx].name ):
                 jdx = jdx + 1
     #remove
-    vrs = list(filter(lambda x: x.avlb and len(x.seq) >= 35, vrs))
-    jrs = list(filter(lambda x: x.avlb and len(x.seq) >= 35, jrs))
+    vrs = list(filter(lambda x: x.avlb and x.cdr3 != None and len(x.seq) >= 35, vrs))
+    jrs = list(filter(lambda x: x.avlb and x.cdr3 != None and len(x.seq) >= 35, jrs))
 
     ####### Build the network, and run MFNC
     G = nx.DiGraph()
@@ -679,7 +683,7 @@ def CommandLineParser():
     parser.add_argument("--out", help="Output folder", default="None")
     parser.add_argument("--align", type=int, default=4)
     parser.add_argument("--threads", type=int, default=4)
-    parser.add_argument("--QC", action='store_true')
+    #parser.add_argument("--QC", action='store_true')
     return parser.parse_args()
 
 def Protocol(inp):
