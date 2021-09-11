@@ -276,8 +276,8 @@ def align(inp, threads, args):
         command = 'cat'
         if r1.split('.')[-1] == 'gz':
             command = 'zcat'
-        os.system(f"cat {r1}" + " | awk '{if(NR%4==1) $0=sprintf(\"@1_%d\",(1+i++)); print;}'" + f" > {output}")
-        os.system(f"cat {r2}" + " | awk '{if(NR%4==1) $0=sprintf(\"@2_%d\",(1+i++)); print;}'" + f" >> {output}")
+        os.system(f"{command} {r1}" + " | awk '{if(NR%4==1) $0=sprintf(\"@1_%d\",(1+i++)); print;}'" + f" > {output}")
+        os.system(f"{command} {r2}" + " | awk '{if(NR%4==1) $0=sprintf(\"@2_%d\",(1+i++)); print;}'" + f" >> {output}")
     else:
         os.system(f"ln -s {os.path.realpath(r1)} {output}")
 
