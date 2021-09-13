@@ -5,6 +5,7 @@ import pandas as pd
 import os
 import time
 import pysam
+from multiprocessing import Pool
 from tqdm.contrib.concurrent import process_map
 import re
 import networkx as nx
@@ -186,14 +187,17 @@ def hamming_distance(chaine1, chaine2):
     return sum(c1 != c2 for c1, c2 in zip(chaine1, chaine2))
 
 def real_score(rd, ref_seq):
-    start, _ = SegmentFromCigar(rd.cigartuples)
+    start, term = SegmentFromCigar(rd.cigartuples)
+    lgt = term - start
     r_pos = rd.reference_start
 
-    left =  max(0, start-r_pos)
-    right = min(len(rd.seq), len(ref_seq)-9+start-r_pos)
+    left_pad =  min(start, r_pos)
+    right_pad = min(len(rd.seq) - term, len(ref_seq)-9 - (r_pos + lgt))
 
-    lgt = right - left
-    return lgt - hamming_distance(rd.seq[left:right], ref_seq[(r_pos - start):(r_pos - start + lgt)]) * 3
+    s1 = rd.seq[(start-left_pad):(term+right_pad)]
+    s2 = ref_seq[(r_pos - left_pad):(r_pos + lgt+right_pad)] 
+    
+    return lgt - hamming_distance(s1, s2) * 3
 
 def map2align(inp, ref, threads):
 
@@ -205,6 +209,8 @@ def map2align(inp, ref, threads):
     bam_file = prefix + "temporary/" + ''.join(random.choices(string.ascii_uppercase + string.digits, k=10)) + '.tmp'
     #os.system(f"{bwa} mem -t {threads} -r 2.3 -k 10 -A 1 -B 2 -L 0 -T 17 -v 0 {ref} {inp} > {sam_file}")
     os.system(f"{bwa} mem -t {threads} -SP -k 10 -A 1 -B 2 -L 0 -T 10 -v 0 {ref} {inp} 2>/dev/null > {sam_file}")
+
+    #os.mkfifo(bam_file)
     os.system(f"{samtools} view -Sh -F 2308 {sam_file} 2>/dev/null > {bam_file}")
     os.system(f"rm -f {sam_file} &")
     return bam_file
@@ -281,15 +287,13 @@ def align(inp, threads, args):
     else:
         os.system(f"ln -s {os.path.realpath(r1)} {output}")
 
-    res = (
-        map2align(output, global_config["TRV"], threads),
-        map2align(output, global_config["TRJ"], threads)
-    )
+    with Pool(2) as pool:
+        res = pool.starmap( map2align, [ (output, global_config["TRV"], threads // 2), (output, global_config["TRJ"], threads//2) ] )
 
-    #res = (
-    #    map2align(output, f"{prefix}reference/MEM2/AIRR-V-DNA.fa", threads),
-    #    map2align(output, f"{prefix}reference/MEM2/AIRR-J-DNA.fa", threads)
-    #)
+    # res = (
+    #     map2align(output, global_config["TRV"], threads),
+    #     map2align(output, global_config["TRJ"], threads)
+    # )
     os.system(f'rm -f {output}')
     return res
 
@@ -454,6 +458,8 @@ def catt(inp, chain, threads):
             jrs.append(res)
     jrs.sort(key = lambda x: x.name)
 
+    selfLog("Parsing bam done")
+
     # if chain == 'TRB':
 
     #     with open("VrsXX.txt", 'w') as handle:
@@ -502,8 +508,8 @@ def catt(inp, chain, threads):
             if res[1] > 0:
                 rd.avlb = True
             if res[1] == 2:
-                rd.avlb = True
                 rd.cdr3 = res[0]
+                break
 
     for rd in jrs:
         for aa in TranslateIntoAA(rd.seq):
@@ -511,7 +517,6 @@ def catt(inp, chain, threads):
             if res[1] > 0:
                 rd.avlb = True
             if res[1] == 2:
-                rd.avlb = True
                 rd.cdr3 = res[0]
                 break
 
@@ -560,8 +565,8 @@ def catt(inp, chain, threads):
             while(jdx < len(jrs) and vrs[vdx].name > jrs[jdx].name ):
                 jdx = jdx + 1
     #remove
-    vrs = list(filter(lambda x: x.avlb and x.cdr3 != None and len(x.seq) >= 35, vrs))
-    jrs = list(filter(lambda x: x.avlb and x.cdr3 != None and len(x.seq) >= 35, jrs))
+    vrs = list(filter(lambda x: x.avlb and len(x.seq) >= 35, vrs))
+    jrs = list(filter(lambda x: x.avlb and len(x.seq) >= 35, jrs))
 
     ####### Build the network, and run MFNC
     G = nx.DiGraph()
@@ -572,6 +577,8 @@ def catt(inp, chain, threads):
     j_nodes = {}
 
     for rd in vrs:
+        if rd.cdr3 != "None":
+            continue
         seq = rd.seq
         l = len(seq)
         rd_node = rd.name + '_V'
@@ -587,6 +594,8 @@ def catt(inp, chain, threads):
             G.add_edge(x, y, capacity = 102410241024, weight = -cnt[y])
 
     for rd in jrs:
+        if rd.cdr3 != "None":
+            continue
         seq = rd.seq
         l = len(seq)
         rd_node = rd.name + '_J'
@@ -694,12 +703,13 @@ def Protocol(inp):
     else:
         r1, r2, sample_id, threads, args, output = inp
 
-    new_inp = align((r1, r2),      threads, args)
+    new_inp = align((r1, r2), threads, args)
 
-    alpha   = catt(new_inp, 'TRA', threads)
-    beta    = catt(new_inp, 'TRB', threads)
-
-    tmp = pd.concat([alpha, beta])
+    with Pool(2) as pool:
+        res = pool.starmap( catt, [ (new_inp, 'TRA', threads), (new_inp, 'TRB', threads) ] )
+    # alpha   = catt(new_inp, 'TRA', threads)
+    # beta    = catt(new_inp, 'TRB', threads)
+    tmp = pd.concat(res)
     tmp['CellId'] = sample_id
 
     os.system(f"rm -f {new_inp[0]} {new_inp[1]}")
