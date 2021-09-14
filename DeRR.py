@@ -457,9 +457,6 @@ def catt(inp, chain, threads):
         if res != None:
             jrs.append(res)
     jrs.sort(key = lambda x: x.name)
-
-    selfLog("Parsing bam done")
-
     # if chain == 'TRB':
 
     #     with open("VrsXX.txt", 'w') as handle:
