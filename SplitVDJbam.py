@@ -52,9 +52,13 @@ if __name__ == "__main__":
     manifest = []
     for idx, (bc, seq, qual) in enumerate(rds):
 
+        if seq == 'None':
+            continue
+
         if cur == 'START':
             cur = bc
             res = []
+        
 
         if bc != cur:
             with open(f"{out_folder}/{cur}.fastq", 'w') as handle:

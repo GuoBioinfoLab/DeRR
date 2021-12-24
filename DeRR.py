@@ -18,7 +18,7 @@ import json
 def selfLog(msg):
     print(time.ctime(time.time()) + "]     %s" % msg)
 
-with open(os.path.realpath(sys.argv[0]).replace("DeRR.py", "config.json"), "r") as handle:
+with open(os.path.realpath(sys.argv[0]).replace(os.path.split(sys.argv[0])[1], "config.json"), "r") as handle:
         global_config = json.load(handle)
 
 AAcode = {'TTT': 'F',
@@ -192,19 +192,26 @@ def real_score(rd, ref_seq):
     r_pos = rd.reference_start
 
     left_pad =  min(start, r_pos)
-    right_pad = min(len(rd.seq) - term, len(ref_seq)-9 - (r_pos + lgt))
+    right_pad = max(0, min(len(rd.seq) - term, len(ref_seq)-9 - (r_pos + lgt)))
 
     s1 = rd.seq[(start-left_pad):(term+right_pad)]
     s2 = ref_seq[(r_pos - left_pad):(r_pos + lgt+right_pad)] 
+
+    return len(s1) - lgt - hamming_distance(s1, s2) * 3
     
-    return lgt - hamming_distance(s1, s2) * 3
+    return len(s1) - lgt - hamming_distance(s1, s2) * 3 # < 0
+
+    # if len(s1) == lgt:
+    #     return 0
+
+    # return  hamming_distance(s1, s2) * 10 / ( len(s1) - lgt ) 
 
 def map2align(inp, ref, threads):
 
     bwa = global_config["bwa"]
     samtools = global_config["samtools"]
 
-    prefix = os.path.realpath(sys.argv[0]).replace("DeRR.py", "")
+    prefix = os.path.realpath(sys.argv[0]).replace(os.path.split(sys.argv[0])[1], "")
     sam_file = prefix + "temporary/"+ ''.join(random.choices(string.ascii_uppercase + string.digits, k=10)) + '.tmp'
     bam_file = prefix + "temporary/" + ''.join(random.choices(string.ascii_uppercase + string.digits, k=10)) + '.tmp'
     #os.system(f"{bwa} mem -t {threads} -r 2.3 -k 10 -A 1 -B 2 -L 0 -T 17 -v 0 {ref} {inp} > {sam_file}")
@@ -227,7 +234,7 @@ def most_common(vals, cnts):
     else:
         return 'None'
 
-def Correct(group):
+def CellCorrect(group):
 
     for idx in range(0, 100):
 
@@ -246,6 +253,8 @@ def Correct(group):
 
         #Counts
         group.iloc[idx, 3] = cnt + sum(group.loc[remove.index[1:], 'Counts'])
+
+
         if vgene == 'None':
             group.iloc[idx, 0] = most_common(remove['Vgene'], remove['Counts'])
         if jgene == 'None':
@@ -262,13 +271,38 @@ def Correct(group):
 
     return group
 
+def PopCorrect(tab):
+
+    #Background TCR level
+    bg = []
+    for bc, group in tab.groupby("CellId"):
+        if group.shape[0] > 2:
+            bg.extend( list(group['Counts'][2:]) )
+    
+    tab = tab[ tab.Counts > np.percentile(bg, 90) ]
+
+    #Esimate the secondary TCR abundance
+    thresold = np.percentile([ group.iloc[1, 3] for bc, group in tab.groupby("CellId") if group.shape[0] > 1 ], 25)
+
+    #Cell-within filter
+    final = []
+    for bc, group in tab.groupby("CellId"):
+        if group.shape[0] > 2:
+            #Do mean filter
+            group = group[ group.Counts > math.sqrt(group.iloc[0, 3]*group.iloc[2, 3]) ]
+            if group.shape[0] > 2:
+                group = group[ group.Counts > thresold ]
+        final.append(group)
+    
+    return pd.concat(final)
+    
 def align(inp, threads, args):
 
     ##### QC
     fastp = global_config["fastp"]
     r1, r2 = inp
 
-    prefix = os.path.realpath(sys.argv[0]).replace("DeRR.py", "")
+    prefix = os.path.realpath(sys.argv[0]).replace(os.path.split(sys.argv[0])[1], "")
     os.system(f"mkdir -p {prefix}/temporary")
     output = prefix + "temporary/" + ''.join(random.choices(string.ascii_uppercase + string.digits, k=10)) + '.tmp'
 
@@ -299,7 +333,7 @@ def align(inp, threads, args):
 
 def assignV(rd, refName2Seq):
 
-    start, _ = SegmentFromCigar(rd.cigartuples)
+    start, term = SegmentFromCigar(rd.cigartuples)
     refname = rd.reference_name
     tseq = rd.seq
     ref_seq = refName2Seq[ refname ]
@@ -325,7 +359,7 @@ def assignV(rd, refName2Seq):
 
 def assignJ(rd, refName2Seq):
 
-    start, _ = SegmentFromCigar(rd.cigartuples)
+    start, term = SegmentFromCigar(rd.cigartuples)
     refname = rd.reference_name
     tseq = rd.seq
     ref_seq = refName2Seq[ refname ]
@@ -448,7 +482,7 @@ def catt(inp, chain, threads):
 
     vrs.sort(key = lambda x: x.name)
 
-
+    
     jrs = []
     for rd in pysam.AlignmentFile(jbam, 'r'):
         if chain not in rd.reference_name:
@@ -457,22 +491,17 @@ def catt(inp, chain, threads):
         if res != None:
             jrs.append(res)
     jrs.sort(key = lambda x: x.name)
-    # if chain == 'TRB':
 
-    #     with open("VrsXX.txt", 'w') as handle:
-    #         for x in vrs:
-    #             handle.write(x.vgene + '   '  + x.seq + '\n')
 
-    #     with open("JrsXX.txt", 'w') as handle:
-    #         for x in jrs:
-    #             handle.write(x.jgene + '   '  + x.seq + '\n')
+    # import pickle
 
-#     print("Vrs\n")
-#     for x in vrs:
-#         print(x.seq)
-#     print("Jrs\n")
-#     for x in jrs:
-#         print(x.seq)
+    # if chain == 'TRA':
+
+    #     with open("VrsAlpha.pk3", 'wb') as handle:
+    #         pickle.dump(vrs, handle)
+
+    #     with open("JrsAlpha.pk3", 'wb') as handle:
+    #         pickle.dump(jrs, handle)
 
 
     config = {
@@ -610,6 +639,7 @@ def catt(inp, chain, threads):
 
     #TODO(chensy) fast judge if there are path
     flow_dict = nx.max_flow_min_cost(G, 'Source', 'Terminal')
+
     rG = G.reverse()
     for node, _ in j_nodes.items():
         rG['Terminal'][node]['capacity'] = 1
@@ -620,12 +650,15 @@ def catt(inp, chain, threads):
     left_v = [ x for (x, val) in flow_dict['Source'].items() if val > 0 ]
     left_j = [ x for (x, val) in flow_dict_r['Terminal'].items() if val > 0 ]
 
-    for rd in vrs:
-        if rd.name + '_V' not in left_v and rd.cdr3 != 'None':
-            final_res.append((rd.vgene, rd.cdr3, 'None'))
-    for rd in jrs:
-        if rd.name + '_J' not in left_j and rd.cdr3 != 'None':
-            final_res.append(('None', rd.cdr3, rd.jgene))
+    #10.13 
+    #TODO(chensy) What the hell these code do ?
+    #Maybe it is for scRNA-Seq, can recovery CDR3 as many as possible
+    # for rd in vrs:
+    #     if rd.name + '_V' not in left_v and rd.cdr3 != 'None':
+    #         final_res.append((rd.vgene, rd.cdr3, 'None'))
+    # for rd in jrs:
+    #     if rd.name + '_J' not in left_j and rd.cdr3 != 'None':
+    #         final_res.append(('None', rd.cdr3, rd.jgene))
 
 
     repeat_list = []
@@ -639,6 +672,7 @@ def catt(inp, chain, threads):
             for aa in TranslateIntoAA(res[1]):
                 cdr3, code = Extract_Motif(aa, config[chain]['cmotif'], config[chain]['fmotif'], config[chain]['coffset'], config[chain]['foffset'], config[chain]['innerC'], config[chain]['innerF'])
                 if code == 2:
+                    break
                     final_res.append((
                         res[2],
                         cdr3,
@@ -653,6 +687,7 @@ def catt(inp, chain, threads):
             for aa in TranslateIntoAA(res[1]):
                 cdr3, code = Extract_Motif(aa, config[chain]['cmotif'], config[chain]['fmotif'], config[chain]['coffset'], config[chain]['foffset'], config[chain]['innerC'], config[chain]['innerF'])
                 if code  == 2:
+                    break
                     final_res.append((
                         res[2],
                         cdr3,
@@ -676,7 +711,7 @@ def catt(inp, chain, threads):
         #tab = tab[ tab.Counts > 2 ]
         tab['Chain'] = chain
 
-        return Correct(tab.sort_values('Counts', ascending=False))
+        return CellCorrect(tab.sort_values('Counts', ascending=False))
     else:
         return pd.DataFrame(columns = ['Vgene', 'Jgene', 'CDR3', 'Counts', 'Chain'])
 
@@ -709,7 +744,8 @@ def Protocol(inp):
     tmp = pd.concat(res)
     tmp['CellId'] = sample_id
 
-    os.system(f"rm -f {new_inp[0]} {new_inp[1]}")
+    os.system(f"rm -f {new_inp[0]} {new_inp[1]} &")
+    #print(new_inp)
     if output != None:
         tmp.to_csv(f"{output}", index=False, sep='\t')
     return tmp
@@ -725,15 +761,15 @@ if __name__ == "__main__":
     max_thread  = min( args['threads'], args['align'])
     max_workers = max( args['threads'] // args['align'], 1 )
 
+    #Single file input
     if args["r1"] != None:
         selfLog("Start detecting TCR")
         res = Protocol((args["r1"], args["r2"], "None", max_thread, args))
         if args["out"] != "None":
             res.to_csv(args["out"], index=False, sep='\t')
         selfLog("Detection end")
-
     else:
-
+    #Manifest input 
         selfLog("Loading Manifest file")
 
         try:
@@ -752,7 +788,9 @@ if __name__ == "__main__":
         selfLog("Detection end")
 
         if args["out"] != "None":
-            pd.concat(res).to_csv(args['out'], index=False, sep='\t')
+            tmp = pd.concat(res)
+            tmp = pd.concat([ PopCorrect(tmp[tmp.Chain == 'TRA']), PopCorrect(tmp[tmp.Chain == 'TRB']) ])
+            tmp.to_csv(args['out'], index=False, sep='\t')
 
     selfLog("Program end")
 
