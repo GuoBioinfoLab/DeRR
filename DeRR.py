@@ -13,6 +13,7 @@ import string
 import random
 import editdistance
 import sys
+import pdb
 import json
 
 def selfLog(msg):
@@ -252,13 +253,13 @@ def CellCorrect(group):
             continue
 
         #Counts
-        group.iloc[idx, 3] = cnt + sum(group.loc[remove.index[1:], 'Counts'])
+        group.iloc[idx, 4] = cnt + sum(group.loc[remove.index[1:], 'Counts'])
 
 
         if vgene == 'None':
             group.iloc[idx, 0] = most_common(remove['Vgene'], remove['Counts'])
         if jgene == 'None':
-            group.iloc[idx, 0] = most_common(remove['Jgene'], remove['Counts'])
+            group.iloc[idx, 1] = most_common(remove['Jgene'], remove['Counts'])
 
         group.drop(remove.index[1:], inplace=True)
 
@@ -393,28 +394,32 @@ def assignJ(rd, refName2Seq):
                 False
             )
 
-
+def matchedNN(CDR3, nn):
+    for idx, aa in enumerate(TranslateIntoAA(nn)):
+        position = aa.find(CDR3)
+        if position != -1:
+            return nn[idx+position*3:idx+position*3+len(CDR3)*3]
 
 #ll: list of pysam AligmentSegmetns
-def TongMing(ll, rev=1):
+# def TongMing(ll, rev=1):
 
-    if len(ll) < 1:
-        return []
+#     if len(ll) < 1:
+#         return []
 
-    cur = ll[0].qname
-    res = []
+#     cur = ll[0].qname
+#     res = []
 
-    for idx in range(0, len(ll)):
+#     for idx in range(0, len(ll)):
 
-        if ll[idx].qname != cur:
-            res.sort(key = lambda x: x.reference_start * rev)
-            yield res
-            cur = ll[idx].qname
-            res = [ll[idx]]
-        else:
-            res.append(ll[idx])
-    else:
-        yield res
+#         if ll[idx].qname != cur:
+#             res.sort(key = lambda x: x.reference_start * rev)
+#             yield res
+#             cur = ll[idx].qname
+#             res = [ll[idx]]
+#         else:
+#             res.append(ll[idx])
+#     else:
+#         yield res
 
 def Extract_Motif(seq, cmotif, fmotif, coffset, foffset, innerC, innerF):
 
@@ -578,6 +583,7 @@ def catt(inp, chain, threads):
                     vrs[vdx].vgene,
                     vrs[vdx].cdr3 if vrs[vdx].cdr3 != "None" else jrs[jdx].cdr3,
                     jrs[jdx].jgene,
+                    matchedNN(vrs[vdx].cdr3 if vrs[vdx].cdr3 != "None" else jrs[jdx].cdr3, vrs[vdx].seq if vrs[vdx].cdr3 != "None" else jrs[jdx].seq)
                 ))
                 vrs[vdx].avlb = False
                 jrs[jdx].avlb = False
@@ -650,15 +656,23 @@ def catt(inp, chain, threads):
     left_v = [ x for (x, val) in flow_dict['Source'].items() if val > 0 ]
     left_j = [ x for (x, val) in flow_dict_r['Terminal'].items() if val > 0 ]
 
-    #10.13 
-    #TODO(chensy) What the hell these code do ?
-    #Maybe it is for scRNA-Seq, can recovery CDR3 as many as possible
-    # for rd in vrs:
-    #     if rd.name + '_V' not in left_v and rd.cdr3 != 'None':
-    #         final_res.append((rd.vgene, rd.cdr3, 'None'))
-    # for rd in jrs:
-    #     if rd.name + '_J' not in left_j and rd.cdr3 != 'None':
-    #         final_res.append(('None', rd.cdr3, rd.jgene))
+
+    for rd in vrs:
+        if rd.name + '_V' not in left_v and rd.cdr3 != 'None' and rd.avlb:
+            final_res.append((
+                rd.vgene, 
+                rd.cdr3, 
+                'None',
+                matchedNN(rd.cdr3, rd.seq)
+            ))
+    for rd in jrs:
+        if rd.name + '_J' not in left_j and rd.cdr3 != 'None' and rd.avlb:
+            final_res.append((
+                'None', 
+                rd.cdr3, 
+                rd.jgene,
+                matchedNN(rd.cdr3, rd.seq)
+            ))
 
 
     repeat_list = []
@@ -676,7 +690,8 @@ def catt(inp, chain, threads):
                     final_res.append((
                         res[2],
                         cdr3,
-                        res[3]
+                        res[3],
+                        matchedNN(cdr3, res[1])
                     ))
                     repeat_list.append(rd[0:-2])
                     break
@@ -691,7 +706,8 @@ def catt(inp, chain, threads):
                     final_res.append((
                         res[2],
                         cdr3,
-                        res[3]
+                        res[3],
+                        matchedNN(cdr3, res[1])
                     ))
                     if rd[0:-2] in repeat_list:
                         reduce_list[cdr3] = reduce_list.setdefault(cdr3, 0 ) + 1
@@ -700,12 +716,17 @@ def catt(inp, chain, threads):
     if len(final_res) > 0:
 
         tab = pd.DataFrame(final_res)
-        tab.columns = [ 'Vgene', 'CDR3', 'Jgene']
+        tab.columns = [ 'Vgene', 'CDR3', 'Jgene', 'CDR3nn']
         tab['Vgene'] = tab['Vgene'].apply(lambda x: x.split('*')[0])
         tab['Jgene'] = tab['Jgene'].apply(lambda x: x.split('*')[0])
         tab['counts'] = 1
 
-        tab = pd.DataFrame([ (most_common(group['Vgene'], group['counts']), most_common(group['Jgene'], group['counts']), cdr3, sum(group['counts']), 'TRB') for cdr3, group in tab.groupby('CDR3') ], columns = ['Vgene', 'Jgene', 'CDR3', 'Counts', 'Chain'])
+
+        tab = pd.DataFrame([ (most_common(group['Vgene'], group['counts']), 
+                              most_common(group['Jgene'], group['counts']), 
+                              cdr3, 
+                              most_common(group['CDR3nn'], group['counts']),
+                              sum(group['counts']), 'TRB') for cdr3, group in tab.groupby('CDR3') ], columns = ['Vgene', 'Jgene', 'CDR3', 'CDR3nn', 'Counts', 'Chain'])
         for seq, val in reduce_list.items():
             tab.loc[ tab.CDR3 == seq, 'Counts' ] = tab.loc[ tab.CDR3 == seq, 'Counts' ] - val
         #tab = tab[ tab.Counts > 2 ]
@@ -739,9 +760,12 @@ def Protocol(inp):
 
     with Pool(2) as pool:
         res = pool.starmap( catt, [ (new_inp, 'TRA', threads), (new_inp, 'TRB', threads) ] )
-    # alpha   = catt(new_inp, 'TRA', threads)
-    # beta    = catt(new_inp, 'TRB', threads)
     tmp = pd.concat(res)
+
+    #alpha   = catt(new_inp, 'TRA', threads)
+    #beta    = catt(new_inp, 'TRB', threads)
+    #tmp = pd.concat([alpha, beta])
+    
     tmp['CellId'] = sample_id
 
     os.system(f"rm -f {new_inp[0]} {new_inp[1]} &")
