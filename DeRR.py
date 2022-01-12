@@ -672,7 +672,7 @@ def catt(inp, chain, threads):
             for aa in TranslateIntoAA(res[1]):
                 cdr3, code = Extract_Motif(aa, config[chain]['cmotif'], config[chain]['fmotif'], config[chain]['coffset'], config[chain]['foffset'], config[chain]['innerC'], config[chain]['innerF'])
                 if code == 2:
-                    break
+                    #break
                     final_res.append((
                         res[2],
                         cdr3,
@@ -687,7 +687,7 @@ def catt(inp, chain, threads):
             for aa in TranslateIntoAA(res[1]):
                 cdr3, code = Extract_Motif(aa, config[chain]['cmotif'], config[chain]['fmotif'], config[chain]['coffset'], config[chain]['foffset'], config[chain]['innerC'], config[chain]['innerF'])
                 if code  == 2:
-                    break
+                    #break
                     final_res.append((
                         res[2],
                         cdr3,
