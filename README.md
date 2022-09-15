@@ -59,6 +59,8 @@ python DeRR.py --inf XXX --out XXX --threads number_of_threads
 
 # Usage
 
+Before running the program, change the executable path of `bwa` and `samtools`  in `config.json`
+
 Typical DERR command for extraction Dual TCR will look like:
 
 ```Shell
@@ -67,10 +69,10 @@ python DeRR.py --inf /path/to/manifest.tsv --out /path/to/result.tsv --threads X
 
 Users should list all the FASTQ files and Cell IDs (barcode) in the **manifest** file. The manifest file should contain 3 tab-seprated columsn like
 
-|| | Cell-id    | Read1 File Name    | Read2 File Name  | Output Path (Option) |
-|--------| -------- | -------- | --------------- | ------ | ----- | ------------------ |
-| Paired  | XXX  |  XXX   | XXX |
-| Single  | XXX  |  **None** | XXX |
+| Data type | Cell-id    | Read1 File Name    | Read2 File Name  | Output Path (Option) |
+|--------| -------- | -------- | --------------- | ------  |
+| Paired  | Cell1  |  XXX   | XXX | XXX |
+| Single  | Cell2  |  XXX | **None** | XXX |
 
 A manifest file is like:
 

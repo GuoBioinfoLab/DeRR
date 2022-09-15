@@ -24,6 +24,9 @@ def selfLog(msg):
 with open(os.path.realpath(sys.argv[0]).replace(os.path.split(sys.argv[0])[1], "config.json"), "r") as handle:
         global_config = json.load(handle)
 
+global_config["TRV"] = os.path.abspath(sys.argv[0])[0:-7] + "reference/AIRR-V-short-clip.fa"
+global_config["TRJ"] = os.path.abspath(sys.argv[0])[0:-7] + "reference/AIRR-J-short-clip.fa"
+
 AAcode = {'TTT': 'F',
  'TTC': 'F',
  'TTA': 'L',
@@ -293,7 +296,6 @@ def PopCorrect(tab):
 def align(inp, threads, args):
 
     ##### QC
-    fastp = global_config["fastp"]
     r1, r2 = inp
 
     prefix = os.path.realpath(sys.argv[0]).replace(os.path.split(sys.argv[0])[1], "")
