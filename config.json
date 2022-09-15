@@ -1,7 +1,7 @@
 {
     "bwa": "/workspace/chensy/dual/0.Script/deer/bwa-mem2-2.2.1_x64-linux/bwa-mem2",
-    "TRV": "/workspace/chensy/dual/0.Script/deer/reference/temp/AIRR-V-short.fa",
-    "TRJ": "/workspace/chensy/dual/0.Script/deer/reference/MEM2/AIRR-J-DNA.fa",
+    "TRV": "/workspace/chensy/dual/0.Script/deer/reference/AIRR-V-short-clip.fa",
+    "TRJ": "/workspace/chensy/dual/0.Script/deer/reference/AIRR-J-short-clip.fa",
     "samtools": "samtools",
     "fastp": "fastp"
 }

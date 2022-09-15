@@ -15,6 +15,8 @@ import editdistance
 import sys
 import pdb
 import json
+import numpy as np
+import math
 
 def selfLog(msg):
     print(time.ctime(time.time()) + "]     %s" % msg)
@@ -96,8 +98,6 @@ def TranslateIntoAA(seq):
     n = len(seq)
     return [ BreakSeqIntoAAcodes(seq, ff, n-(n-ff)%3) for ff in [0, 1, 2] ]
 
-#There must be some more elegant and faster way to do this
-#Tip1: according to MCMF value to see wheter the network is liantong
 def FindPath(cur, term, G):
     path = [cur]
     marker = set()
@@ -117,7 +117,6 @@ def FindPath(cur, term, G):
 
 def BuiltPath(path, v_nodes, j_nodes, k=25):
 
-# Some code for these is no path
     if path == None or len(path) < 2:
         return (3, "", "", "")
 
@@ -199,13 +198,7 @@ def real_score(rd, ref_seq):
     s2 = ref_seq[(r_pos - left_pad):(r_pos + lgt+right_pad)] 
 
     return len(s1) - lgt - hamming_distance(s1, s2) * 3
-    
-    return len(s1) - lgt - hamming_distance(s1, s2) * 3 # < 0
 
-    # if len(s1) == lgt:
-    #     return 0
-
-    # return  hamming_distance(s1, s2) * 10 / ( len(s1) - lgt ) 
 
 def map2align(inp, ref, threads):
 
@@ -215,10 +208,8 @@ def map2align(inp, ref, threads):
     prefix = os.path.realpath(sys.argv[0]).replace(os.path.split(sys.argv[0])[1], "")
     sam_file = prefix + "temporary/"+ ''.join(random.choices(string.ascii_uppercase + string.digits, k=10)) + '.tmp'
     bam_file = prefix + "temporary/" + ''.join(random.choices(string.ascii_uppercase + string.digits, k=10)) + '.tmp'
-    #os.system(f"{bwa} mem -t {threads} -r 2.3 -k 10 -A 1 -B 2 -L 0 -T 17 -v 0 {ref} {inp} > {sam_file}")
+   
     os.system(f"{bwa} mem -t {threads} -SP -k 10 -A 1 -B 2 -L 0 -T 10 -v 0 {ref} {inp} 2>/dev/null > {sam_file}")
-
-    #os.mkfifo(bam_file)
     os.system(f"{samtools} view -Sh -F 2308 {sam_file} 2>/dev/null > {bam_file}")
     os.system(f"rm -f {sam_file} &")
     return bam_file
@@ -235,6 +226,7 @@ def most_common(vals, cnts):
     else:
         return 'None'
 
+#Correct the false TCR within cell
 def CellCorrect(group):
 
     for idx in range(0, 100):
@@ -272,6 +264,7 @@ def CellCorrect(group):
 
     return group
 
+#Correct the false TCR based on cell population information
 def PopCorrect(tab):
 
     #Background TCR level
@@ -306,13 +299,6 @@ def align(inp, threads, args):
     prefix = os.path.realpath(sys.argv[0]).replace(os.path.split(sys.argv[0])[1], "")
     os.system(f"mkdir -p {prefix}/temporary")
     output = prefix + "temporary/" + ''.join(random.choices(string.ascii_uppercase + string.digits, k=10)) + '.tmp'
-
-    # if args['QC']:
-    #     if r2 != "None":
-    #         os.system(f"{fastp} -i {r1} -I {r2} -m --merged_out {output} --include_unmerged --detect_adapter_for_pe -q 20 -e 25 -L 30 -c -g -w {threads} -h /dev/null -j /dev/null --overlap_len_require 20 --overlap_diff_limit 2  >/dev/null 2>&1")
-    #     else:
-    #         os.system(f"{fastp} -i {r1} -o {output} -q 20 -e 25 -L 30 -c -g -w {threads} -h /dev/null -j /dev/null  >/dev/null 2>&1")
-    # else:
     if r2 != "None":
         command = 'cat'
         if r1.split('.')[-1] == 'gz':
@@ -324,11 +310,6 @@ def align(inp, threads, args):
 
     with Pool(2) as pool:
         res = pool.starmap( map2align, [ (output, global_config["TRV"], threads // 2), (output, global_config["TRJ"], threads//2) ] )
-
-    # res = (
-    #     map2align(output, global_config["TRV"], threads),
-    #     map2align(output, global_config["TRJ"], threads)
-    # )
     os.system(f'rm -f {output}')
     return res
 
@@ -364,26 +345,14 @@ def assignJ(rd, refName2Seq):
     refname = rd.reference_name
     tseq = rd.seq
     ref_seq = refName2Seq[ refname ]
-    # r_pos = rd.reference_start
-    # r_lgt = len(ref_seq)
 
     if start - 1 < 10:
         return None
     elif real_score(rd, ref_seq) < 0:
-        #eal_score(rd, ref_seq) < term - start - 2:
         return None
     elif 'N' in tseq:
         return None
     else:
-#         return Myread(
-#             rd.qname,
-#             tseq[0:start] + ref_seq[r_pos:],
-#             rd.qual[0:start] + 'G'*(r_lgt-r_pos),
-#             "None",
-#             refname,
-#             "None",
-#             False
-#         )
 
          return Myread(
                 rd.qname,
@@ -469,14 +438,14 @@ def Extract_Motif(seq, cmotif, fmotif, coffset, foffset, innerC, innerF):
 def catt(inp, chain, threads):
 
     vbam, jbam = inp
-
     refName2Seq = {}
 
-    #prefix = os.path.realpath(sys.argv[0]).replace("DeRR.py", "")
+    # Read reference sequences
     for name in [ global_config["TRV"], global_config["TRJ"] ]:
         for seq in SeqIO.parse(name, 'fasta'):
             refName2Seq[ seq.id ] = str(seq.seq).upper()
 
+    # Parse mapped reads from bam file and filter out unqulitifed reads
     vrs = []
     for rd in pysam.AlignmentFile(vbam, 'r'):
         if chain not in rd.reference_name:
@@ -484,10 +453,8 @@ def catt(inp, chain, threads):
         res = assignV(rd, refName2Seq)
         if res != None:
             vrs.append(res)
-
     vrs.sort(key = lambda x: x.name)
 
-    
     jrs = []
     for rd in pysam.AlignmentFile(jbam, 'r'):
         if chain not in rd.reference_name:
@@ -496,18 +463,6 @@ def catt(inp, chain, threads):
         if res != None:
             jrs.append(res)
     jrs.sort(key = lambda x: x.name)
-
-
-    # import pickle
-
-    # if chain == 'TRA':
-
-    #     with open("VrsAlpha.pk3", 'wb') as handle:
-    #         pickle.dump(vrs, handle)
-
-    #     with open("JrsAlpha.pk3", 'wb') as handle:
-    #         pickle.dump(jrs, handle)
-
 
     config = {
         'TRB':{
@@ -572,7 +527,7 @@ def catt(inp, chain, threads):
             cnt[kmer] = cnt.setdefault(kmer, 0) + 1
 
 
-##### Remove reads that span over junction
+    ##### Remove reads that span over junction
     vdx, jdx = 0, 0
     final_res = []
     while(vdx < len(vrs) and jdx < len(jrs)):
@@ -608,6 +563,7 @@ def catt(inp, chain, threads):
     v_nodes = {}
     j_nodes = {}
 
+    # Add Edge
     for rd in vrs:
         if rd.cdr3 != "None":
             continue
@@ -642,17 +598,19 @@ def catt(inp, chain, threads):
         for x, y in zip(nodes, nodes):
             G.add_edge(x, y, capacity = 102410241024, weight = -cnt[y])
 
-
-    #TODO(chensy) fast judge if there are path
+    #Find the forward flow
     flow_dict = nx.max_flow_min_cost(G, 'Source', 'Terminal')
 
+    #Build the reverse network
     rG = G.reverse()
     for node, _ in j_nodes.items():
         rG['Terminal'][node]['capacity'] = 1
     for node, _ in v_nodes.items():
         rG[node]['Source']['capacity'] = 10241024
+    #Find the reverse flow
     flow_dict_r = nx.max_flow_min_cost(rG, 'Terminal', 'Source')
 
+    #Get reads that has flow in network
     left_v = [ x for (x, val) in flow_dict['Source'].items() if val > 0 ]
     left_j = [ x for (x, val) in flow_dict_r['Terminal'].items() if val > 0 ]
 
@@ -673,7 +631,6 @@ def catt(inp, chain, threads):
                 rd.jgene,
                 matchedNN(rd.cdr3, rd.seq)
             ))
-
 
     repeat_list = []
     reduce_list = {}
@@ -713,6 +670,7 @@ def catt(inp, chain, threads):
                         reduce_list[cdr3] = reduce_list.setdefault(cdr3, 0 ) + 1
                     break
 
+    #Output results
     if len(final_res) > 0:
 
         tab = pd.DataFrame(final_res)
@@ -745,7 +703,6 @@ def CommandLineParser():
     parser.add_argument("--out", help="Output folder", default="None")
     parser.add_argument("--align", type=int, default=4)
     parser.add_argument("--threads", type=int, default=4)
-    #parser.add_argument("--QC", action='store_true')
     return parser.parse_args()
 
 def Protocol(inp):
@@ -761,11 +718,6 @@ def Protocol(inp):
     with Pool(2) as pool:
         res = pool.starmap( catt, [ (new_inp, 'TRA', threads), (new_inp, 'TRB', threads) ] )
     tmp = pd.concat(res)
-
-    #alpha   = catt(new_inp, 'TRA', threads)
-    #beta    = catt(new_inp, 'TRB', threads)
-    #tmp = pd.concat([alpha, beta])
-    
     tmp['CellId'] = sample_id
 
     os.system(f"rm -f {new_inp[0]} {new_inp[1]} &")
@@ -817,4 +769,3 @@ if __name__ == "__main__":
             tmp.to_csv(args['out'], index=False, sep='\t')
 
     selfLog("Program end")
-
