@@ -7,7 +7,7 @@
 DERR (Detection Dual T-cell receptor in single cell sequencing) is a toolkit for:
 
 - Detection TCR for scRNA-Seq data
-- Identification Dual-TCR  in scRNA-Seq
+- Identification Dual-TCR in scRNA-Seq
 - Classify primary and minor chain for single CDR3 sequence
 
 # Overview
@@ -67,16 +67,12 @@ python DeRR.py --inf /path/to/manifest.tsv --out /path/to/result.tsv --threads X
 
 Users should list all the FASTQ files and Cell IDs (barcode) in the **manifest** file. The manifest file should contain 3 tab-seprated columsn like
 
-```
-#For paired-end reads
-Cell-id\tRead1-file-name\tRead2-file-name\n
-#(Option)give output path for each cell in last row like
-#Cell-id\tRead1-file-name\tRead2-file-name\Path-Output\n
-#For single-end reads
-Cell-id\tRead1-file-name\tNone\n
-```
+|| | Cell-id    | Read1 File Name    | Read2 File Name  | Output Path (Option) |
+|--------| -------- | -------- | --------------- | ------ | ----- | ------------------ |
+| Paired  | XXX  |  XXX   | XXX |
+| Single  | XXX  |  **None** | XXX |
 
-A  manifest file is like:
+A manifest file is like:
 
 ![](Manifest.png)
 
@@ -88,8 +84,6 @@ The **result.tsv** is like:
 | TRBV3-1  | TRBJ2-7  | CASSQGGALTYEQYF | 198    | TRB   | AAACCTGAGCGATAGC-1 |
 | TRBV11-2 | TRBJ22-4 | CASSFDGLAKNIQYF | 68     | TRB   | AAACCTGAGGAGTCTG-1 |
 | TRAV9-2  | TRAJ49   | CALFAGNQFYF     | 139    | TRA   | AAACCTGCATCTGGTA-1 |
-
-
 
 For **10X V(D)J** sequencing data which don't provide FASTQ files for each cell, we provide a script help demulpitexing the data:
 
