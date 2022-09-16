@@ -46,8 +46,11 @@ We recommand using a vitrual conda envoriment to install above packages and soft
 conda create -c conda-forge -c bioconda -n deer tqdm pandas biopython pysam networkx bwa samtools fastp editdistance -y
 
 # As sometimes conda might be very slow, users could use mamba instead of conda for faster installation
-conda install -n base -c conda-forge mamba #install mamba
-mamba create -c conda-forge -c bioconda -n deer tqdm pandas biopython pysam networkx bwa samtools fastp editdistance -y #install requirments
+
+#install mamba
+conda install -n base -c conda-forge mamba
+#install requirments
+mamba create -c conda-forge -c bioconda -n deer tqdm pandas biopython pysam networkx bwa samtools fastp editdistance -y 
 
 
 # Activate the envoriment
@@ -94,5 +97,6 @@ python SplitVDJbam.py --bam all_contig.bam --list cell_barcodes.json --out /path
 ```
 where `all_contig.bam` and `cell_barcodes.json` is the output from cellranger, usually located in `ProjectName/outs`
 
+# Log
 
-
+* 2022-09-15: Bug fixes
