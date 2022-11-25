@@ -418,29 +418,6 @@ def Extract_Motif(seq, cmotif, fmotif, coffset, foffset, innerC, innerF):
 
     return ("None", 1)
 
-# def Extract_CDR3(seq, cmotif, fmotif, coffset, foffset, innerC, innerF):
-
-#     res = 0
-#     Cx = [ m.end() - coffset for m in re.finditer(cmotif, seq) ]
-#     Fx = [ m.end() - foffset for m in re.finditer(fmotif, seq) ]
-
-#     if len(Cx) ==0 and len(Fx) == 0:
-#         return ("None", 0)
-
-#     if (len(Cx) < 0 ) ^ (len(Fx) < 0):
-#         if len(Cx) < 0:
-#             Cx = [ m.end() -3 for m in re.finditer(innerC, seq) ]
-#         else:
-#             Fx = [ m for m in re.finditer(innerF, seq)]
-
-#     for (idx, xc) in enumerate(Cx):
-#         for xf in Fx:
-#             if (22 >=xf -xc >= 6 ) and ( idx == len(Cx) -1  or not (32>=xf-Cx[idx+1]>=7)) and not "*" in seq[xc:xf]:
-#                 return (seq[xc:xf-2], 2)
-
-#     return ("None", 1)
-
-
 def catt(inp, chain, threads):
 
     vbam, jbam = inp
@@ -758,7 +735,7 @@ if __name__ == "__main__":
             tab = pd.read_csv(f"{args['inf']}", sep='\t', index_col=0, header=None)
         except:
             selfLog("WARNING: Manifest file is empty")
-            res = pd.DataFrame(columns = ['Vgene', 'Jgene', 'CDR3', 'Counts', 'Chain'])
+            res = pd.DataFrame(columns = ["sequence_id", "sequence", "rev_comp", "productive", "v_call", "d_call", "j_call", "sequence_alignment," "germline_alignment", "junction",  "junction_aa", "v_cigar", "d_cigar", "j_cigar"])
             res.to_csv(args['out'], index=False, sep='\t')
             exit(0)
 
@@ -772,6 +749,22 @@ if __name__ == "__main__":
         if args["out"] != "None":
             tmp = pd.concat(res)
             tmp = pd.concat([ PopCorrect(tmp[tmp.Chain == 'TRA']), PopCorrect(tmp[tmp.Chain == 'TRB']) ])
+
+            tmp.rename({
+                "Vgene": 'v_call',
+                "Jgene": 'j_call',
+                "CDR3": "junction_aa",
+                "Counts": 'duplicate_count',
+                'Chain': "locus",
+                'CDR3nn': "junction",
+                'CellId': 'cell_id'
+            })
+
+            tmp['productive'] = 'True'
+
+            for airr_col in ['sequence_id', 'sequence', 'rev_comp', 'd_call', 'sequence_alignment', 'germline_alignment', 'v_cigar', 'd_cigar', 'j_cigar']:
+                tmp[airr_col] = ""
+
             tmp.to_csv(args['out'], index=False, sep='\t')
 
     selfLog("Program end")
