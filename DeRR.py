@@ -276,7 +276,11 @@ def PopCorrect(tab):
         if group.shape[0] > 2:
             bg.extend( list(group['Counts'][2:]) )
     
-    tab = tab[ tab.Counts > np.percentile(bg, 90) ]
+    #asset no enough sample to filter
+    try:
+        tab = tab[ tab.Counts > np.percentile(bg, 90) ]
+    except:
+        return tab
 
     #Esimate the secondary TCR abundance
     thresold = np.percentile([ group.iloc[1, 3] for bc, group in tab.groupby("CellId") if group.shape[0] > 1 ], 25)
@@ -285,7 +289,7 @@ def PopCorrect(tab):
     final = []
     for bc, group in tab.groupby("CellId"):
         if group.shape[0] > 2:
-            #Do mean filter
+            #mean filter
             group = group[ group.Counts > math.sqrt(group.iloc[0, 3]*group.iloc[2, 3]) ]
             if group.shape[0] > 2:
                 group = group[ group.Counts > thresold ]
