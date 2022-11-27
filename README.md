@@ -6,15 +6,13 @@
 
 DERR (Detection Dual T-cell receptor in single cell sequencing) is a toolkit for:
 
-- Detection TCR for scRNA-Seq data
-- Identification Dual-TCR in scRNA-Seq
-- Classify primary and minor chain for single CDR3 sequence
+- Detection TCR in single cell sequencing data
+- Identification Dual-TCR in scRNA-Seq/scTCR-Seq
 
 # Overview
 
 - HomePage: [http://bioinfo.life.hust.edu.cn/DeRR]
 - Github: [https://github.com/GuoBioinfoLab/DeRR]
-- For detials please see our [Bioinformatics publication](!https://doi.org/10.1093/bioinformatics/btaa432)
 
 # Installation
 
@@ -100,3 +98,28 @@ where `all_contig.bam` and `cell_barcodes.json` is the output from cellranger, u
 # Log
 
 * 2022-09-15: Bug fixes
+
+# Notice
+
+The source code of DeRR include TCR V/J gene sequence from IMGT (https://www.imgt.org/vquest/refseqh.html), but for speeding up the program, all the sequences of V gene retain only the terminal 100bp.
+
+# Term of Use
+
+DeRR is maintained by An-Yuan Guo Bioinformatics Lab (Guo Lab). Guo Lab may, from time to time, update the content on https://github.com/GuoBioinfoLab/DeRR. Guo Lab makes no warranties or representations, express or implied, with respect to any of the Terms, including as to the present accuracy, completeness, timeliness, adequacy, or usefulness of any of the Terms. By using this website, you agree that Guo Lab will not be liable for any losses or damages arising from your use of or reliance on the Terms, or other websites or information to which this website may be linked.
+
+DeRR is freely accessible for research use in an academic setting. You may view the Terms solely for your own personal reference or use for research in an academic setting. All academic research use of the Terms must credit DeRR as the source of the Terms and reference these Terms of Use; outside of scientific publication, you may not otherwise redistribute or share the Terms with any third party, in part or in whole, for any purpose, without the express permission of Guo Lab.
+
+Unless you have signed a license agreement with Guo Lab, you may not use any part of the Terms for any other purpose, including:
+
+* use or incorporation into a commercial product or towards performance of a commercial service;
+* research use in a commercial setting;
+* use for patient services; or
+* generation of reports in a hospital or other patient care setting.
+
+You may not copy, transfer, reproduce, modify or create derivative works of DeRR for any commercial purpose without the express permission of Guo Lab. If you seek to use Derr for such purposes, please request the license which best describes your anticipated use of DeRR below:
+
+* Research use in commercial setting
+* Use in a commercial product
+* Use for patient services or reports in a hospital setting
+* Please contact me at guoay@hust.edu.cn
+

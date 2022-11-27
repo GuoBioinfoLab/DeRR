@@ -283,14 +283,14 @@ def PopCorrect(tab):
         return tab
 
     #Esimate the secondary TCR abundance
-    thresold = np.percentile([ group.iloc[1, 3] for bc, group in tab.groupby("CellId") if group.shape[0] > 1 ], 25)
+    thresold = np.percentile([ group.loc[group.index[1], 'Counts'] for bc, group in tab.groupby("CellId") if group.shape[0] > 1 ], 25)
 
     #Cell-within filter
     final = []
     for bc, group in tab.groupby("CellId"):
         if group.shape[0] > 2:
             #mean filter
-            group = group[ group.Counts > math.sqrt(group.iloc[0, 3]*group.iloc[2, 3]) ]
+            group = group[ group.Counts > math.sqrt(group.loc[group.index[0], 'Counts']*group.iloc[group.index[2], 'Counts']) ]
             if group.shape[0] > 2:
                 group = group[ group.Counts > thresold ]
         final.append(group)
@@ -429,23 +429,33 @@ def catt(inp, chain, threads):
             refName2Seq[ seq.id ] = str(seq.seq).upper()
 
     # Parse mapped reads from bam file and filter out unqulitifed reads
+
+
     vrs = []
-    for rd in pysam.AlignmentFile(vbam, 'r'):
-        if chain not in rd.reference_name:
-            continue
-        res = assignV(rd, refName2Seq)
-        if res != None:
-            vrs.append(res)
-    vrs.sort(key = lambda x: x.name)
+    try:
+        for rd in pysam.AlignmentFile(vbam, 'r'):
+            if chain not in rd.reference_name:
+                continue
+            res = assignV(rd, refName2Seq)
+            if res != None:
+                vrs.append(res)
+        vrs.sort(key = lambda x: x.name)
+    except:
+        print("No read in input file")
+
 
     jrs = []
-    for rd in pysam.AlignmentFile(jbam, 'r'):
-        if chain not in rd.reference_name:
-            continue
-        res = assignJ(rd, refName2Seq)
-        if res != None:
-            jrs.append(res)
-    jrs.sort(key = lambda x: x.name)
+    try:
+        for rd in pysam.AlignmentFile(jbam, 'r'):
+            if chain not in rd.reference_name:
+                continue
+            
+            res = assignJ(rd, refName2Seq)
+            if res != None:
+                jrs.append(res)
+        jrs.sort(key = lambda x: x.name)
+    except:
+        print("No read in input file")
 
     config = {
         'TRB':{
@@ -658,8 +668,8 @@ def catt(inp, chain, threads):
 
         tab = pd.DataFrame(final_res)
         tab.columns = [ 'Vgene', 'CDR3', 'Jgene', 'CDR3nn']
-        tab['Vgene'] = tab['Vgene'].apply(lambda x: x.split('*')[0])
-        tab['Jgene'] = tab['Jgene'].apply(lambda x: x.split('*')[0])
+        # tab['Vgene'] = tab['Vgene'].apply(lambda x: x.split('*')[0])
+        # tab['Jgene'] = tab['Jgene'].apply(lambda x: x.split('*')[0])
         tab['counts'] = 1
 
 
@@ -685,6 +695,7 @@ def CommandLineParser():
     parser.add_argument("--r2", help="Read2 file", default="None")
     parser.add_argument("--out", help="Output folder", default="None")
     parser.add_argument("--align", type=int, default=4)
+    parser.add_argument("--alleleseq", action="store_const", const=True, default=False)
     parser.add_argument("--threads", type=int, default=4)
     return parser.parse_args()
 
@@ -709,6 +720,33 @@ def Protocol(inp):
         tmp.to_csv(f"{output}", index=False, sep='\t')
     return tmp
 
+def formatOutput(unform_res, args):
+
+
+    unform_res.rename( columns= {
+        "Vgene": 'v_call',
+        "Jgene": 'j_call',
+        "CDR3": "junction_aa",
+        "Counts": 'duplicate_count',
+        'Chain': "locus",
+        'CDR3nn': "junction",
+        'CellId': 'cell_id'
+    }, inplace=True)
+
+    unform_res['productive'] = 'True'
+
+    for airr_col in ['sequence_id', 'sequence', 'rev_comp', 'd_call', 'sequence_alignment', 'germline_alignment', 'v_cigar', 'd_cigar', 'j_cigar']:
+        unform_res[airr_col] = ""
+
+    if args['alleleseq']:
+
+        refName2Seq = {}
+        for name in [ global_config["TRV"], global_config["TRJ"] ]:
+            for seq in SeqIO.parse(name, 'fasta'):
+                refName2Seq[ seq.id ] = str(seq.seq).upper()
+        unform_res['v_sequence'] = unform_res['v_call'].apply(lambda x: refName2Seq[x])
+        unform_res['j_sequence'] = unform_res['j_call'].apply(lambda x: refName2Seq[x])
+
 
 if __name__ == "__main__":
 
@@ -720,11 +758,19 @@ if __name__ == "__main__":
     max_thread  = min( args['threads'], args['align'])
     max_workers = max( args['threads'] // args['align'], 1 )
 
+    refName2Seq = {}
+
+    # Read reference sequences
+    for name in [ global_config["TRV"], global_config["TRJ"] ]:
+        for seq in SeqIO.parse(name, 'fasta'):
+            refName2Seq[ seq.id ] = str(seq.seq).upper()
+
     #Single file input
     if args["r1"] != None:
         selfLog("Start detecting TCR")
         res = Protocol((args["r1"], args["r2"], "None", max_thread, args))
         if args["out"] != "None":
+            formatOutput(res, args)
             res.to_csv(args["out"], index=False, sep='\t')
         selfLog("Detection end")
     else:
@@ -749,22 +795,7 @@ if __name__ == "__main__":
         if args["out"] != "None":
             tmp = pd.concat(res)
             tmp = pd.concat([ PopCorrect(tmp[tmp.Chain == 'TRA']), PopCorrect(tmp[tmp.Chain == 'TRB']) ])
-
-            tmp.rename({
-                "Vgene": 'v_call',
-                "Jgene": 'j_call',
-                "CDR3": "junction_aa",
-                "Counts": 'duplicate_count',
-                'Chain': "locus",
-                'CDR3nn': "junction",
-                'CellId': 'cell_id'
-            })
-
-            tmp['productive'] = 'True'
-
-            for airr_col in ['sequence_id', 'sequence', 'rev_comp', 'd_call', 'sequence_alignment', 'germline_alignment', 'v_cigar', 'd_cigar', 'j_cigar']:
-                tmp[airr_col] = ""
-
+            formatOutput(tmp, args)
             tmp.to_csv(args['out'], index=False, sep='\t')
 
     selfLog("Program end")
