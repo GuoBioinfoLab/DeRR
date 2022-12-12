@@ -40,14 +40,14 @@ We recommand using a vitrual conda envoriment to install above packages and soft
 
 ```Shell
 # Create the envroiment and install the requirments
-conda create -c conda-forge -c bioconda -n deer tqdm pandas biopython pysam networkx bwa samtools fastp editdistance -y
+conda create -c conda-forge -c bioconda -n deer tqdm pandas biopython pysam networkx bwa samtools editdistance -y
 
 # As sometimes conda might be very slow, users could use mamba instead of conda for faster installation
 
 #install mamba
 conda install -n base -c conda-forge mamba
 #install requirments
-mamba create -c conda-forge -c bioconda -n deer tqdm pandas biopython pysam networkx bwa samtools fastp editdistance -y 
+mamba create -c conda-forge -c bioconda -n deer tqdm pandas biopython pysam networkx bwa samtools editdistance -y 
 
 
 # Activate the envoriment
