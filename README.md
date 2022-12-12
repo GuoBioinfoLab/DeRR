@@ -35,7 +35,6 @@ Follwing tools are also required and shoule be able to access in PATH:
 
 * bwa
 * samtools
-* fastp
 
 We recommand using a vitrual conda envoriment to install above packages and softwares:
 

@@ -402,18 +402,24 @@ def Extract_Motif(seq, cmotif, fmotif, coffset, foffset, innerC, innerF):
     Cx = [ m.end() - coffset for m in re.finditer(cmotif, seq) ]
     Fx = [ m.end() - foffset for m in re.finditer(fmotif, seq) ]
 
+    if len(Cx)>1:
+        Cx = [  pos for pos in Cx if pos in [ m.end() - 3 for m in re.finditer(innerC, seq) ] ]
+    
+
     if len(Cx) ==0 and len(Fx) == 0:
         return ("None", 0)
 
     if (len(Cx) < 1 ) ^ (len(Fx) < 1):
         if len(Cx) < 1:
-            Cx = [ m.end() -3 for m in re.finditer(innerC, seq) ]
+            Cx = [ m.end() - 3 for m in re.finditer(innerC, seq) ]
         else:
-            Fx = [ m.end() +2 for m in re.finditer(innerF, seq)]
+            Fx = [ m.end() + 2 for m in re.finditer(innerF, seq)]
+
+  
 
     for (idx, xc) in enumerate(Cx):
         for xf in Fx:
-            if (26 >=xf-xc-2 >= 7 ) and ( idx == len(Cx) -1  or not (26>=xf-Cx[idx+1]>=7)) and not "*" in seq[xc:xf]:
+            if (26 >=xf-xc-2 >= 7 ) and ( idx == len(Cx) -1 or not (26>=xf-Cx[idx+1]>=7)) and (not "*" in seq[xc:xf-2]):
                 return (seq[xc:xf-2], 2)
 
     return ("None", 1)
@@ -429,8 +435,6 @@ def catt(inp, chain, threads):
             refName2Seq[ seq.id ] = str(seq.seq).upper()
 
     # Parse mapped reads from bam file and filter out unqulitifed reads
-
-
     vrs = []
     try:
         for rd in pysam.AlignmentFile(vbam, 'r'):
@@ -671,18 +675,21 @@ def catt(inp, chain, threads):
         # tab['Vgene'] = tab['Vgene'].apply(lambda x: x.split('*')[0])
         # tab['Jgene'] = tab['Jgene'].apply(lambda x: x.split('*')[0])
         tab['counts'] = 1
-
-
+        unique_clone = set(tab['CDR3'])
+        disjoint = { clone:clone for clone in unique_clone }
+        for clone in unique_clone:
+            for another in unique_clone - set([clone]):
+                if clone in another:
+                    disjoint[clone] = another
         tab = pd.DataFrame([ (most_common(group['Vgene'], group['counts']), 
                               most_common(group['Jgene'], group['counts']), 
-                              cdr3, 
+                              disjoint[cdr3], 
                               most_common(group['CDR3nn'], group['counts']),
                               sum(group['counts']), 'TRB') for cdr3, group in tab.groupby('CDR3') ], columns = ['Vgene', 'Jgene', 'CDR3', 'CDR3nn', 'Counts', 'Chain'])
         for seq, val in reduce_list.items():
             tab.loc[ tab.CDR3 == seq, 'Counts' ] = tab.loc[ tab.CDR3 == seq, 'Counts' ] - val
         #tab = tab[ tab.Counts > 2 ]
         tab['Chain'] = chain
-
         return CellCorrect(tab.sort_values('Counts', ascending=False))
     else:
         return pd.DataFrame(columns = ['Vgene', 'Jgene', 'CDR3', 'Counts', 'Chain'])
@@ -695,7 +702,8 @@ def CommandLineParser():
     parser.add_argument("--r2", help="Read2 file", default="None")
     parser.add_argument("--out", help="Output folder", default="None")
     parser.add_argument("--align", type=int, default=4)
-    parser.add_argument("--alleleseq", action="store_const", const=True, default=False)
+    parser.add_argument("--alleleseq", action="store_true")
+    parser.add_argument("--population", action="store_true")
     parser.add_argument("--threads", type=int, default=4)
     return parser.parse_args()
 
@@ -794,7 +802,8 @@ if __name__ == "__main__":
 
         if args["out"] != "None":
             tmp = pd.concat(res)
-            tmp = pd.concat([ PopCorrect(tmp[tmp.Chain == 'TRA']), PopCorrect(tmp[tmp.Chain == 'TRB']) ])
+            if args['population']:
+                tmp = pd.concat([ PopCorrect(tmp[tmp.Chain == 'TRA']), PopCorrect(tmp[tmp.Chain == 'TRB']) ])
             formatOutput(tmp, args)
             tmp.to_csv(args['out'], index=False, sep='\t')
 
