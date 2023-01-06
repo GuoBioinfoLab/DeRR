@@ -2,9 +2,9 @@
 
 <img src='DEERR_logo.png' align='right' height=350>
 
-### What is **DERR**
+### What is **DeRR**
 
-DERR (Detection Dual T-cell receptor in single cell sequencing) is a toolkit for:
+DeRR (Detection Dual T-cell receptor in single cell sequencing) is a method for:
 
 - Detection TCR in single cell sequencing data
 - Identification Dual-TCR in scRNA-Seq/scTCR-Seq
@@ -16,7 +16,7 @@ DERR (Detection Dual T-cell receptor in single cell sequencing) is a toolkit for
 
 # Installation
 
-DeRR required follwing python packages:
+DeRR required following python packages:
 
 * tqdm
 * pandas 
@@ -31,22 +31,22 @@ Users could using `pip` or others package managers to install these packages lik
 pip install tqdm pandas biopython pysam networkx editdistance
 ```
 
-Follwing tools are also required and shoule be able to access in PATH:
+Following tools are also required and should be able to access in PATH:
 
 * bwa
 * samtools
 
-We recommand using a vitrual conda envoriment to install above packages and softwares:
+We recommend using a virtual conda environment to install above packages and softwares:
 
 ```Shell
-# Create the envroiment and install the requirments
+# Create the environment and install the requirements
 conda create -c conda-forge -c bioconda -n deer tqdm pandas biopython pysam networkx bwa samtools editdistance -y
 
 # As sometimes conda might be very slow, users could use mamba instead of conda for faster installation
 
 #install mamba
 conda install -n base -c conda-forge mamba
-#install requirments
+#install requirements
 mamba create -c conda-forge -c bioconda -n deer tqdm pandas biopython pysam networkx bwa samtools editdistance -y 
 
 
@@ -56,18 +56,17 @@ conda activate deer
 python DeRR.py --inf XXX --out XXX --threads number_of_threads
 ```
 
-
 # Usage
 
 Before running the program, change the executable path of `bwa` and `samtools`  in `config.json`
 
-Typical DERR command for extraction Dual TCR will look like:
+Typical DeRR command for extraction Dual TCR will look like:
 
 ```Shell
 python DeRR.py --inf /path/to/manifest.tsv --out /path/to/result.tsv --threads X
 ```
 
-Users should list all the FASTQ files and Cell IDs (barcode) in the **manifest** file. The manifest file should contain 3 tab-seprated columsn like
+Users should list all the FASTQ files and Cell IDs (barcode) in the **manifest** file. The manifest file should contain at least 3 tab-separated columns like
 
 | Data type | Cell-id    | Read1 File Name    | Read2 File Name  | Output Path (Option) |
 |--------| -------- | -------- | --------------- | ------  |
@@ -80,23 +79,31 @@ A manifest file is like:
 
 The **result.tsv** is like:
 
-| Vgene    | Jgene    | CDR3            | Counts | Chain | CellId             |
-| -------- | -------- | --------------- | ------ | ----- | ------------------ |
-| TRAV3    | TRAJ27   | CAHNTNAGKSTF    | 13     | TRA   | AAACCTGAGATCCTGT-1 |
-| TRBV3-1  | TRBJ2-7  | CASSQGGALTYEQYF | 198    | TRB   | AAACCTGAGCGATAGC-1 |
-| TRBV11-2 | TRBJ22-4 | CASSFDGLAKNIQYF | 68     | TRB   | AAACCTGAGGAGTCTG-1 |
-| TRAV9-2  | TRAJ49   | CALFAGNQFYF     | 139    | TRA   | AAACCTGCATCTGGTA-1 |
+| v_call      | j_call     | junction_aa     | duplicate_count | locus | junction                                      | cell_id            | productive | sequence_id | sequence | rev_comp | d_call | sequence_alignment | germline_alignment | v_cigar | d_cigar | j_cigar |
+|-------------|:-----------|:----------------|:----------------|:------|:----------------------------------------------|--------------------|------------|:------------|:---------|:---------|:-------|:-------------------|:-------------------|:--------|:--------|:--------|
+| TRBV28*01   | TRBJ1-5*01 | CAITAGSANTEAFF  | 389             | TRB   | TGCATCGTCAGAGTCGCATCGGGTGGCGACTACAAGCTCAGCTTT | AAACCTGAGGCATTGG-1 | True       |             |          |          |        |                    |                    |         |         |         |
+| TRAV26-1*02 | TRAJ20*01  | CIVRVASGGDYKLSF | 748             | TRA   | TGCATCGTCAGAGTCGCATCGGGTGGCGACTACAAGCTCAGCTTT | AAACCTGATTCATTGG-1 | True       |             |          |          |        |                    |                    |         |         |         |
+
+To compatible with the AIRR format standard, there are some columns in the output of DeRR with **None** value like `d_call`, `d_cigar` etc. The columns with valuable information are list below:
+
+| columns         | Description                                             |
+|:----------------|:--------------------------------------------------------|
+| v_call          | V allele gene name                                      |
+| j_call          | J allele gene name                                      |
+| junction_aa     | CDR3 amino acid sequence                                |
+| duplicate_count | abundance of TCR in raw count                           |
+| locus           | TRA/TRB                                                 |
+| junction        | CDR3 nucleotide sequence                                |
+| cell_id         | The name of input cell                                  |
+| productive      | Is the TCR CDR3 region productive, which is always True |
+
+
 
 For **10X V(D)J** sequencing data which don't provide FASTQ files for each cell, we provide a script help demulpitexing the data:
-
 ```
 python SplitVDJbam.py --bam all_contig.bam --list cell_barcodes.json --out /path/to/fastq_output --file /path/to/Manifest.tsv
 ```
 where `all_contig.bam` and `cell_barcodes.json` is the output from cellranger, usually located in `ProjectName/outs`
-
-# Log
-
-* 2022-09-15: Bug fixes
 
 # Notice
 
