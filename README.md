@@ -1,6 +1,6 @@
 # DeRR
 
-<img src='DEERR_logo.png' align='right' height=350>
+<img src='./assets/DEERR_logo.png' align='right' height=350>
 
 ### What is **DeRR**
 
@@ -31,7 +31,7 @@ Users could using `pip` or others package managers to install these packages lik
 pip install tqdm pandas biopython pysam networkx editdistance
 ```
 
-Following tools are also required and should be able to access in PATH:
+Following tools are also required and should be able to access in $PATH or set their paths in `config.json`
 
 * bwa
 * samtools
@@ -39,26 +39,27 @@ Following tools are also required and should be able to access in PATH:
 We recommend using a virtual conda environment to install above packages and softwares:
 
 ```Shell
-# Create the environment and install the requirements
+# 1. Create the environment and install the requirements
 conda create -c conda-forge -c bioconda -n deer tqdm pandas biopython pysam networkx bwa samtools editdistance -y
 
 # As sometimes conda might be very slow, users could use mamba instead of conda for faster installation
+# install mamba by `conda install -n base -c conda-forge mamba`
+# then run `mamba create -c conda-forge -c bioconda -n deer tqdm pandas biopython pysam networkx bwa samtools editdistance -y `
 
-#install mamba
-conda install -n base -c conda-forge mamba
-#install requirements
-mamba create -c conda-forge -c bioconda -n deer tqdm pandas biopython pysam networkx bwa samtools editdistance -y 
+# 2. Download the IMGT reference and build the bwa index
+# 2.1 Download the TRAV and TRBV gene sequences (fasta format, F+ORF+all P) from https://www.imgt.org/vquest/refseqh.html, save to refereces/TR-V.fa
+# 2.2 Download the TRAJ and TRBJ gene sequences (fasta format, F+ORF+all P) from https://www.imgt.org/vquest/refseqh.html, save to refereces/TR-J.fa
 
 
-# Activate the envoriment
-conda activate deer
+# 3. Run DeRR
+# (optional) Activate the envoriment `conda activate deer`
 # Do some analysis
 python DeRR.py --inf XXX --out XXX --threads number_of_threads
 ```
 
 # Usage
 
-Before running the program, change the executable path of `bwa` and `samtools`  in `config.json`
+> Before running the program, change the executable path of `bwa` and `samtools`  in `config.json`
 
 Typical DeRR command for extraction Dual TCR will look like:
 
