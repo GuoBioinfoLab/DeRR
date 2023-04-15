@@ -328,10 +328,10 @@ def assignV(rd, refName2Seq):
     r_pos = rd.reference_start
     r_lgt = len(ref_seq)
 
-    if (r_lgt - r_pos) - (len(tseq) - start  ) > -10:
+    if (r_lgt - r_pos) - (len(tseq) - start  ) > 0:
         #discard
         return None
-    elif real_score(rd, ref_seq) < 0:
+    elif real_score(rd, ref_seq) < -5:
         return None
     elif 'N' in tseq:
         return None
@@ -352,9 +352,7 @@ def assignJ(rd, refName2Seq):
     tseq = rd.seq
     ref_seq = refName2Seq[ refname ]
 
-    if start - 1 < 10:
-        return None
-    elif real_score(rd, ref_seq) < 0:
+    if real_score(rd, ref_seq) < -6:
         return None
     elif 'N' in tseq:
         return None
@@ -761,8 +759,17 @@ if __name__ == "__main__":
     selfLog("Program start")
 
     # First run check
-    
 
+    for f in [  global_config['TRV'], global_config['TRJ'] ]:
+        if not os.path.exists( f + '.bwt'):
+            reads = [ x for x in SeqIO.parse(f, 'fasta') ]
+            for read in reads:
+                read.name = read.name.split("|")[1]
+                read.id = read.id.split("|")[1]
+                read.description = ""
+            SeqIO.write(reads, f, 'fasta')
+            os.system(f"{ global_config['bwa'] } index {f}")
+    
     args = CommandLineParser()
     args = { arg:getattr(args, arg) for arg in vars(args) }
 
