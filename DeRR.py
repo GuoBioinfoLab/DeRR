@@ -478,8 +478,6 @@ def catt(inp, chain, threads):
         }
 
     }
-
-
     #### 2. First retrieve
     ####    Find reads that have complete fregments
 

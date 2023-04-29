@@ -106,10 +106,6 @@ python SplitVDJbam.py --bam all_contig.bam --list cell_barcodes.json --out /path
 ```
 where `all_contig.bam` and `cell_barcodes.json` is the output from cellranger, usually located in `ProjectName/outs`
 
-# Notice
-
-The source code of DeRR include TCR V/J gene sequence from IMGT (https://www.imgt.org/vquest/refseqh.html), but for speeding up the program, all the sequences of V gene retain only the terminal 100bp.
-
 # Term of Use
 
 DeRR is maintained by An-Yuan Guo Bioinformatics Lab (Guo Lab). Guo Lab may, from time to time, update the content on https://github.com/GuoBioinfoLab/DeRR. Guo Lab makes no warranties or representations, express or implied, with respect to any of the Terms, including as to the present accuracy, completeness, timeliness, adequacy, or usefulness of any of the Terms. By using this website, you agree that Guo Lab will not be liable for any losses or damages arising from your use of or reliance on the Terms, or other websites or information to which this website may be linked.
