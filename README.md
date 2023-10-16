@@ -1,4 +1,4 @@
-![image](https://github.com/GuoBioinfoLab/DeRR/assets/10047675/c61511b4-0f51-4f43-933f-966981fba399)# DeRR
+# DeRR
 
 <img src='./assets/DEERR_logo.png' align='right' height=350>
 
