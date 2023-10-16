@@ -1,4 +1,4 @@
-# DeRR
+![image](https://github.com/GuoBioinfoLab/DeRR/assets/10047675/c61511b4-0f51-4f43-933f-966981fba399)# DeRR
 
 <img src='./assets/DEERR_logo.png' align='right' height=350>
 
@@ -98,13 +98,23 @@ To compatible with the AIRR format standard, there are some columns in the outpu
 | cell_id         | The name of input cell                                  |
 | productive      | Is the TCR CDR3 region productive, which is always True |
 
+## Cell demulpitexing
 
 
-For **10X V(D)J** sequencing data which don't provide FASTQ files for each cell, we provide a script help demulpitexing the data:
+DeRR supports various types of single-cell data, but for sequencing types that do not directly provide a fastq file for each cell, users need to perform demultiplexing themselves to obtain fastq files corresponding to each cell, and then create  manifest.tsv file.
+
+Taking 10X scRNA-Seq as an example, the Cell Barcode is stored in the CB tag of each record in the BAM file. Demultiplexing can be performed based on the CB tag of each record, we provide a script help demulpitexing the data:
 ```
 python SplitVDJbam.py --bam all_contig.bam --list cell_barcodes.json --out /path/to/fastq_output --file /path/to/Manifest.tsv
 ```
-where `all_contig.bam` and `cell_barcodes.json` is the output from cellranger, usually located in `ProjectName/outs`
+where `all_contig.bam` and `cell_barcodes.json` is the output from cellranger, usually located in `{ProjectName}/outs`
+
+We also have tested other types of scRNA-Seq data,
+
+* Drop-Seq (data from PRJNA961723,  Cell barcode were inferred from the first 12 bases of read 1)
+* CEL-Seq (PRJNA961718,  Cell barcode were inferred from the first 8 bases of read 1))
+* MARS-Seq (PRJNA81671,  Cell barcode were inferred from the first 7 bases of read 2)
+
 
 # Notice
 
