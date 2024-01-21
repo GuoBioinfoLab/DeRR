@@ -198,7 +198,7 @@ def real_score(rd, ref_seq):
     right_pad = max(0, min(len(rd.seq) - term, len(ref_seq)-9 - (r_pos + lgt)))
 
     s1 = rd.seq[(start-left_pad):(term+right_pad)]
-    s2 = ref_seq[(r_pos - left_pad):(r_pos + lgt+right_pad)] 
+    s2 = ref_seq[(r_pos - left_pad):(r_pos + lgt+right_pad)]
 
     return len(s1) - lgt - hamming_distance(s1, s2) * 3
 
@@ -211,7 +211,7 @@ def map2align(inp, ref, threads):
     prefix = os.path.realpath(sys.argv[0]).replace(os.path.split(sys.argv[0])[1], "")
     sam_file = prefix + "temporary/"+ ''.join(random.choices(string.ascii_uppercase + string.digits, k=10)) + '.tmp'
     bam_file = prefix + "temporary/" + ''.join(random.choices(string.ascii_uppercase + string.digits, k=10)) + '.tmp'
-   
+
     os.system(f"{bwa} mem -t {threads} -SP -k 10 -A 1 -B 2 -L 0 -T 10 -v 0 {ref} {inp} 2>/dev/null > {sam_file}")
     os.system(f"{samtools} view -Sh -F 2308 {sam_file} 2>/dev/null > {bam_file}")
     os.system(f"rm -f {sam_file} &")
@@ -275,7 +275,7 @@ def PopCorrect(tab):
     for bc, group in tab.groupby("CellId"):
         if group.shape[0] > 2:
             bg.extend( list(group['Counts'][2:]) )
-    
+
     #asset no enough sample to filter
     try:
         tab = tab[ tab.Counts > np.percentile(bg, 90) ]
@@ -294,9 +294,9 @@ def PopCorrect(tab):
             if group.shape[0] > 2:
                 group = group[ group.Counts > thresold ]
         final.append(group)
-    
+
     return pd.concat(final)
-    
+
 def align(inp, threads, args):
 
     ##### QC
@@ -402,7 +402,7 @@ def Extract_Motif(seq, cmotif, fmotif, coffset, foffset, innerC, innerF):
 
     if len(Cx)>1:
         Cx = [  pos for pos in Cx if pos in [ m.end() - 3 for m in re.finditer(innerC, seq) ] ]
-    
+
 
     if len(Cx) ==0 and len(Fx) == 0:
         return ("None", 0)
@@ -413,7 +413,7 @@ def Extract_Motif(seq, cmotif, fmotif, coffset, foffset, innerC, innerF):
         else:
             Fx = [ m.end() + 2 for m in re.finditer(innerF, seq)]
 
-  
+
 
     for (idx, xc) in enumerate(Cx):
         for xf in Fx:
@@ -451,7 +451,7 @@ def catt(inp, chain, threads):
         for rd in pysam.AlignmentFile(jbam, 'r'):
             if chain not in rd.reference_name:
                 continue
-            
+
             res = assignJ(rd, refName2Seq)
             if res != None:
                 jrs.append(res)
@@ -611,16 +611,16 @@ def catt(inp, chain, threads):
     for rd in vrs:
         if rd.name + '_V' not in left_v and rd.cdr3 != 'None' and rd.avlb:
             final_res.append((
-                rd.vgene, 
-                rd.cdr3, 
+                rd.vgene,
+                rd.cdr3,
                 'None',
                 matchedNN(rd.cdr3, rd.seq)
             ))
     for rd in jrs:
         if rd.name + '_J' not in left_j and rd.cdr3 != 'None' and rd.avlb:
             final_res.append((
-                'None', 
-                rd.cdr3, 
+                'None',
+                rd.cdr3,
                 rd.jgene,
                 matchedNN(rd.cdr3, rd.seq)
             ))
@@ -677,9 +677,9 @@ def catt(inp, chain, threads):
             for another in unique_clone - set([clone]):
                 if clone in another:
                     disjoint[clone] = another
-        tab = pd.DataFrame([ (most_common(group['Vgene'], group['counts']), 
-                              most_common(group['Jgene'], group['counts']), 
-                              disjoint[cdr3], 
+        tab = pd.DataFrame([ (most_common(group['Vgene'], group['counts']),
+                              most_common(group['Jgene'], group['counts']),
+                              disjoint[cdr3],
                               most_common(group['CDR3nn'], group['counts']),
                               sum(group['counts']), 'TRB') for cdr3, group in tab.groupby('CDR3') ], columns = ['Vgene', 'Jgene', 'CDR3', 'CDR3nn', 'Counts', 'Chain'])
         for seq, val in reduce_list.items():
@@ -790,11 +790,11 @@ if __name__ == "__main__":
             res.to_csv(args["out"], index=False, sep='\t')
         selfLog("Detection end")
     else:
-    #Manifest input 
+    #Manifest input
         selfLog("Loading Manifest file")
 
         try:
-            tab = pd.read_csv(f"{args['inf']}", sep='\t', index_col=0, header=None)
+            tab = pd.read_csv(f"{args['inf']}", sep='\t', index_col=0, header=None, keep_default_na = False )
         except:
             selfLog("WARNING: Manifest file is empty")
             res = pd.DataFrame(columns = ["sequence_id", "sequence", "rev_comp", "productive", "v_call", "d_call", "j_call", "sequence_alignment," "germline_alignment", "junction",  "junction_aa", "v_cigar", "d_cigar", "j_cigar"])
