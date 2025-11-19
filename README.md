@@ -9,7 +9,7 @@ DeRR (Detection Dual T-cell receptor in single cell sequencing) is a method for:
 - Detection TCR in single cell sequencing data
 - Identification Dual-TCR in scRNA-Seq/scTCR-Seq
 
-If you find MHCflurry useful in your research please cite:
+If you find DeRR useful in your research please cite:
 
 > Chen, Si-Yi, et al. "DeRR: A Unique Detecting Method and the First Landscape for T Cells with Dual T Cell Receptors from Large-scale Single Cell Data." Genomics, Proteomics & Bioinformatics (2025): qzaf090. [https://academic.oup.com/gpb/advance-article/doi/10.1093/gpbjnl/qzaf090/8275777](https://doi.org/10.1093/gpbjnl/qzaf090)
 
