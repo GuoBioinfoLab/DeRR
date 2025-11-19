@@ -11,7 +11,7 @@ DeRR (Detection Dual T-cell receptor in single cell sequencing) is a method for:
 
 # Overview
 
-- HomePage: [http://bioinfo.life.hust.edu.cn/DeRR]
+- HomePage: [https://guolab.wchscu.cn/DeRR/]
 - Github: [https://github.com/GuoBioinfoLab/DeRR]
 
 # Installation
@@ -139,5 +139,5 @@ You may not copy, transfer, reproduce, modify or create derivative works of DeRR
 * Research use in commercial setting
 * Use in a commercial product
 * Use for patient services or reports in a hospital setting
-* Please contact me at guoay@hust.edu.cn
+* Please contact me at guoanyuan@wchscu.cn
 
